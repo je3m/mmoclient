@@ -1,3 +1,5 @@
 .idea/**
 artifactsMMO
 *.swp
+token.txt
+.jj/

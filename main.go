@@ -123,13 +123,14 @@ func updateInventory(state *CharacterState, resp *ActionResponse) {
 
 }
 
+var API_TOKEN = ""
+
 // perform given action and block until cooldown is up
 func performActionAndWait(state *CharacterState, actionName string, actionData []byte) (*ActionResponse, error) {
 	response := new(ActionResponse)
 
 	// Define the endpoint and token
 	apiURL := "https://api.artifactsmmo.com/my/" + state.Name + "/action/" + actionName
-	token := ""
 
 	// Create the HTTP request
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(actionData))
@@ -141,7 +142,7 @@ func performActionAndWait(state *CharacterState, actionName string, actionData [
 	// Set headers
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
 
 	// Send the request
 	client := &http.Client{}
@@ -540,9 +541,18 @@ func mikeLoop(currentCharacter *CharacterState) error {
 	}
 }
 
+func setApiToken() {
+	api_tok, err := os.ReadFile("token.txt")
+	if err != nil {
+		fmt.Printf("Failed to read API token: %v\n", err)
+		os.Exit(1)
+	}
+	API_TOKEN = string(api_tok)
+}
+
 func main() {
-	characterMap := make(map[string]CharacterState)
-	characterMap["squidward"] = CharacterState{Name: "squidward"}
+	setApiToken()
+
 	chadState := CharacterState{Name: "chad"}
 	squidwardState := CharacterState{Name: "squidward"}
 	lilyState := CharacterState{Name: "lily"}
