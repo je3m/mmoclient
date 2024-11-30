@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 )
@@ -36,6 +37,13 @@ func move(state *CharacterState, location string) error {
 	_, err = performActionAndWait(state, "move", requestBody)
 
 	if err != nil {
+		var responseCodeError *ResponseCodeError
+		if errors.As(err, &responseCodeError) {
+			if responseCodeError.code == CodeCharacterAlreadyMap {
+				// we are already here so it's fine
+				return nil
+			}
+		}
 		fmt.Printf("Failed to move to %s at coords (%v, %v)", location, destination.X, destination.Y)
 		return err
 	}

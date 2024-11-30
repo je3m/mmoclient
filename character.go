@@ -1,8 +1,12 @@
 package main
 
-import "time"
+import (
+	"log/slog"
+	"time"
+)
 
 type CharacterState struct {
+	Logger               *slog.Logger
 	Name                 string    `json:"name"`
 	Account              string    `json:"account"`
 	Skin                 string    `json:"skin"`
@@ -84,6 +88,10 @@ type CharacterState struct {
 	} `json:"inventory"`
 }
 
+func (state CharacterState) String() string {
+	return state.Name
+}
+
 // I think go makes you do all this shit manually :c
 func (state *CharacterState) updateInventory(resp *ActionResponse) {
 	state.Inventory = nil
@@ -91,5 +99,4 @@ func (state *CharacterState) updateInventory(resp *ActionResponse) {
 		state.Inventory = append(state.Inventory, slot)
 	}
 	state.InventoryMaxItems = resp.Data.Character.InventoryMaxItems
-
 }

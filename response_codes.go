@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 type ArtifactsResponseCode int
 
 const (
@@ -68,6 +70,14 @@ const (
 	CodeMapNotFound        ArtifactsResponseCode = 597
 	CodeMapContentNotFound ArtifactsResponseCode = 598
 )
+
+type ResponseCodeError struct {
+	code ArtifactsResponseCode
+}
+
+func (e ResponseCodeError) Error() string {
+	return fmt.Sprintf("%v", e.code)
+}
 
 func (me ArtifactsResponseCode) String() string {
 	switch me {
@@ -175,6 +185,5 @@ func (me ArtifactsResponseCode) String() string {
 		return "MapContentNotFound"
 	default:
 		return "BAD_ERROR_CODE"
-
 	}
 }
