@@ -3,106 +3,80 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 )
 
-func move(state *CharacterState, x int, y int) error {
-	type MoveRequest struct {
-		X int `json:"x"`
-		Y int `json:"y"`
-	}
+type MoveRequest struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
 
-	moveRequest := MoveRequest{
-		X: x,
-		Y: y,
-	}
+var locations = map[string]MoveRequest{
+	"AshTreeForest":         MoveRequest{-1, 0},
+	"CopperMine":            MoveRequest{2, 0},
+	"IronMine":              MoveRequest{1, 7},
+	"Bank":                  MoveRequest{4, 1},
+	"Spruce":                MoveRequest{2, 6},
+	"Sunflower":             MoveRequest{2, 2},
+	"Shrimp":                MoveRequest{5, 2},
+	"Gudgeon":               MoveRequest{5, 2},
+	"Cooking":               MoveRequest{1, 1},
+	"WeaponCraftingStation": MoveRequest{2, 1},
+}
+
+func move(state *CharacterState, location string) error {
+	destination := locations[location]
 	// Marshal the request body to JSON
-	requestBody, err := json.Marshal(moveRequest)
+	requestBody, err := json.Marshal(destination)
 	if err != nil {
 		fmt.Printf("Error marshalling request body: %v\n", err)
-		return err
+		os.Exit(1)
 	}
 
 	_, err = performActionAndWait(state, "move", requestBody)
-	return err
-}
 
-func moveToAshTreeForest(state *CharacterState) error {
-	err := move(state, -1, 0)
 	if err != nil {
-		fmt.Printf("Failed to move to ash tree forest: %v\n", err)
+		fmt.Printf("Failed to move to %s at coords (%v, %v)", location, destination.X, destination.Y)
 		return err
 	}
 	return nil
+}
+
+func moveWeaponCraftStation(state *CharacterState) error {
+	return move(state, "WeaponCraftingStation")
+}
+func moveToAshTreeForest(state *CharacterState) error {
+	return move(state, "AshTreeForest")
 }
 
 func moveToCopperMine(state *CharacterState) error {
-	err := move(state, 2, 0)
-	if err != nil {
-		fmt.Printf("Failed to move to ash tree forest: %v\n", err)
-		return err
-	}
-	return nil
+	return move(state, "CopperMine")
 }
 
 func moveToIronMine(state *CharacterState) error {
-	err := move(state, 1, 7)
-	if err != nil {
-		fmt.Printf("Failed to move to iron mine: %v\n", err)
-		return err
-	}
-	return nil
+	return move(state, "IronMine")
 }
 
 func moveToBank(state *CharacterState) error {
-	err := move(state, 4, 1)
-	if err != nil {
-		fmt.Printf("Failed to move to bank: %v\n", err)
-		return err
-	}
-	return nil
+	return move(state, "Bank")
 }
 
 func moveToSpruce(state *CharacterState) error {
-	err := move(state, 2, 6)
-	if err != nil {
-		fmt.Printf("Failed to move to spruce: %v\n", err)
-		return err
-	}
-	return nil
+	return move(state, "Spruce")
 }
 
 func moveToSunflower(state *CharacterState) error {
-	err := move(state, 2, 2)
-	if err != nil {
-		fmt.Printf("Failed to move to bank: %v\n", err)
-		return err
-	}
-	return nil
+	return move(state, "Sunflower")
 }
 
 func moveToShrimp(state *CharacterState) error {
-	err := move(state, 5, 2)
-	if err != nil {
-		fmt.Printf("Failed to move to shrimp: %v\n", err)
-		return err
-	}
-	return nil
+	return move(state, "Shrimp")
 }
 
 func moveToGudgeon(state *CharacterState) error {
-	err := move(state, 4, 2)
-	if err != nil {
-		fmt.Printf("Failed to move to bank: %v\n", err)
-		return err
-	}
-	return nil
+	return move(state, "Gudgeon")
 }
 
 func moveToCooking(state *CharacterState) error {
-	err := move(state, 1, 1)
-	if err != nil {
-		fmt.Printf("Failed to move to kitchen: %v\n", err)
-		return err
-	}
-	return nil
+	return move(state, "Kitchen")
 }
