@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+type CharacterResponse struct {
+	Data []CharacterState
+}
+
 type ActionResponse struct {
 	Data struct {
 		Cooldown struct {
@@ -89,6 +93,52 @@ func performActionAndWait(state *CharacterState, actionName string, actionData [
 	time.Sleep(time.Duration(cooldown) * time.Second)
 
 	return response, err
+}
+
+// query game for initial status of all characters
+func getGameStatus() ([]CharacterState, error) {
+	response := new(CharacterResponse)
+
+	// Define the endpoint and token
+	apiURL := "https://api.artifactsmmo.com/my/characters"
+
+	// Create the HTTP request
+	req, err := http.NewRequest("GET", apiURL, bytes.NewBuffer([]byte{}))
+	if err != nil {
+		return nil, err
+	}
+
+	// Set headers
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read and display the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, ResponseCodeError{ArtifactsResponseCode(resp.StatusCode)}
+	}
+
+	err = json.Unmarshal(body, &response)
+
+	if err != nil {
+		slog.Error("Error parsing response: %v\n", err)
+		return nil, err
+	}
+
+	return response.Data, nil
 }
 
 func fight(state *CharacterState) {
@@ -320,12 +370,18 @@ func lilyLoop(currentCharacter *CharacterState) error {
 	for {
 		dumpAtBank(currentCharacter)
 
-		err := moveToSunflower(currentCharacter)
+		err := withdrawItemAtBank(currentCharacter, "sunflower", 100)
+		if err != nil {
+			return err
+		}
+
+		err = moveToAlchemy(currentCharacter)
 		if err != nil {
 			currentCharacter.Logger.Warn("Failed to move to sunflower: %v\n", err)
 			return err
 		}
-		err = gatherUntil(currentCharacter, "sunflower", 100)
+
+		err = craftUntil(currentCharacter, "small_health_potion", 30)
 		if err != nil {
 			return err
 		}
@@ -351,18 +407,18 @@ func timothyLoop(currentCharacter *CharacterState) error {
 func mikeLoop(currentCharacter *CharacterState) error {
 	for {
 		dumpAtBank(currentCharacter)
-		err := withdrawItemAtBank(currentCharacter, "gudgeon", 100)
 
+		err := withdrawItemAtBank(currentCharacter, "shrimp", 100)
 		if err != nil {
 			return err
 		}
 
 		err = moveToCooking(currentCharacter)
 		if err != nil {
-			currentCharacter.Logger.Warn("Failed to move to kitchen: %v\n", err)
+			currentCharacter.Logger.Error("Failed to move to kitchen", "error", err)
 			return err
 		}
-		err = craftUntil(currentCharacter, "cooked_gudgeon", 100)
+		err = craftUntil(currentCharacter, "cooked_shrimp", 100)
 		if err != nil {
 			return err
 		}
@@ -377,63 +433,70 @@ func setApiToken() {
 	}
 	API_TOKEN = string(api_tok)
 }
-func setupLogging(states []*CharacterState) error {
+func setupLogging(state *CharacterState) error {
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})
 
 	logger := slog.New(handler)
+	state.Logger = logger.WithGroup(state.Name)
 
-	for _, state := range states {
-		state.Logger = logger.WithGroup(state.Name)
-	}
 	return nil
 }
 
 func main() {
-	chadState := CharacterState{Name: "chad"}
-	squidwardState := CharacterState{Name: "squidward"}
-	lilyState := CharacterState{Name: "lily"}
-	timothyState := CharacterState{Name: "timothy"}
-	mikeState := CharacterState{Name: "mike"}
-
-	states := []*CharacterState{&chadState, &squidwardState, &lilyState, &timothyState, &mikeState}
-
-	err := setupLogging(states)
-	if err != nil {
-		println("Failed to setup logging: %v\n", err)
-		os.Exit(1)
-	}
+	stateRefs := make(map[string]*CharacterState)
 
 	setApiToken()
 
+	states, err := getGameStatus()
+	if err != nil {
+		slog.Error("Failed to get game status: %v\n", err)
+		os.Exit(1)
+	}
+
+	for i, state := range states {
+		stateRefs[state.Name] = &states[i]
+		err = setupLogging(&states[i])
+		if err != nil {
+			println("Failed to setup logging: %v\n", err)
+			os.Exit(1)
+		}
+
+	}
 	go func() {
-		err := chadLoop(&chadState)
+		chadState := stateRefs["chad"]
+		err := chadLoop(chadState)
 		if err != nil {
 			chadState.Logger.Error("Failed to chad loop: %v\n", err)
 		}
 	}()
 	go func() {
-		err := squidwardLoop(&squidwardState)
+		squidwardState := stateRefs["squidward"]
+		err := squidwardLoop(squidwardState)
 		if err != nil {
 			squidwardState.Logger.Error("Failed to squward loop: %v\n", err)
 		}
 	}()
 	go func() {
-		err := lilyLoop(&lilyState)
+		lilyState := stateRefs["lily"]
+		err := lilyLoop(lilyState)
 		if err != nil {
 			lilyState.Logger.Error("Failed to lily loop: %v\n", err)
 		}
 	}()
 
 	go func() {
-		err := timothyLoop(&timothyState)
+		timothyState := stateRefs["timothy"]
+		err := timothyLoop(timothyState)
 		if err != nil {
 			timothyState.Logger.Error("Failed to timothy loop: %v\n", err)
 		}
 	}()
+
 	go func() {
-		err := mikeLoop(&mikeState)
+		mikeState := stateRefs["mike"]
+		err := mikeLoop(mikeState)
 		if err != nil {
 			mikeState.Logger.Error("Failed to mike loop: %v\n", err)
 		}
