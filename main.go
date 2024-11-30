@@ -11,11 +11,6 @@ import (
 	"time"
 )
 
-type MoveRequest struct {
-	X int `json:"x"`
-	Y int `json:"y"`
-}
-
 type CharacterState struct {
 	Name                 string    `json:"name"`
 	Account              string    `json:"account"`
@@ -186,11 +181,15 @@ func performActionAndWait(state *CharacterState, actionName string, actionData [
 }
 
 func move(state *CharacterState, x int, y int) error {
+	type MoveRequest struct {
+		X int `json:"x"`
+		Y int `json:"y"`
+	}
+
 	moveRequest := MoveRequest{
 		X: x,
 		Y: y,
 	}
-
 	// Marshal the request body to JSON
 	requestBody, err := json.Marshal(moveRequest)
 	if err != nil {
@@ -214,8 +213,8 @@ func gathering(state *CharacterState) {
 	performActionAndWait(state, "gathering", []byte{})
 }
 
-func getItemInventoryQty(response *ActionResponse, itemName string) int {
-	inv := response.Data.Character.Inventory
+func getItemInventoryQty(state *CharacterState, itemName string) int {
+	inv := state.Inventory
 	for _, item := range inv {
 		if item.Code == itemName {
 			return item.Quantity
@@ -239,7 +238,30 @@ func gatherUntil(state *CharacterState, item string, quantity int) error {
 			fmt.Printf("Error making request: %v\n", err)
 			return err
 		}
-		numberHas := getItemInventoryQty(resp, item)
+		numberHas := getItemInventoryQty(&resp.Data.Character, item)
+		numberRemaining = quantity - numberHas
+
+		fmt.Printf(
+			"Have: %v\n"+
+				"Need: %v\n"+
+				"Remaining: %v\n", numberHas, quantity, numberRemaining)
+
+	}
+	return nil
+}
+
+// Perform cooking action until inventory contains at least <quantity> of item
+func craftUntil(state *CharacterState, item string, quantity int) error {
+	numberRemaining := 1
+
+	for numberRemaining > 0 {
+		err := craftItem(state, item)
+
+		if err != nil {
+			fmt.Printf("Error crafting item: %v\n", err)
+			return err
+		}
+		numberHas := getItemInventoryQty(state, item)
 		numberRemaining = quantity - numberHas
 
 		fmt.Printf(
@@ -268,7 +290,7 @@ func unequip(state *CharacterState, slot string) {
 func moveWeaponCraftStation(state *CharacterState) {
 	move(state, 2, 1)
 }
-func craftItem(state *CharacterState, code string) {
+func craftItem(state *CharacterState, code string) error {
 	type CraftItemRequest struct {
 		Code string `json:"code"`
 	}
@@ -280,7 +302,9 @@ func craftItem(state *CharacterState, code string) {
 	_, err = performActionAndWait(state, "crafting", jsonData)
 	if err != nil {
 		fmt.Printf("Error making crafting item: %v\n", err)
+		return err
 	}
+	return nil
 }
 
 func equipItem(state *CharacterState, code string, slot string) error {
@@ -372,6 +396,16 @@ func moveToGudgeon(state *CharacterState) error {
 	}
 	return nil
 }
+
+func moveToCooking(state *CharacterState) error {
+	err := move(state, 1, 1)
+	if err != nil {
+		fmt.Printf("Failed to move to kitchen: %v\n", err)
+		return err
+	}
+	return nil
+}
+
 func depositItemAtBank(state *CharacterState, code string, qty int) error {
 	type DepositItemRequest struct {
 		Code     string `json:"code"`
@@ -383,6 +417,23 @@ func depositItemAtBank(state *CharacterState, code string, qty int) error {
 		os.Exit(1)
 	}
 	_, err = performActionAndWait(state, "bank/deposit", jsonData)
+	if err != nil {
+		fmt.Printf("Error depositing item: %v\n", err)
+		return err
+	}
+	return nil
+}
+func withdrawItemAtBank(state *CharacterState, code string, qty int) error {
+	type WithdrawItemRequest struct {
+		Code     string `json:"code"`
+		Quantity int    `json:"quantity"`
+	}
+	jsonData, err := json.Marshal(WithdrawItemRequest{code, qty})
+	if err != nil {
+		fmt.Printf("Error marshalling request body: %v\n", err)
+		os.Exit(1)
+	}
+	_, err = performActionAndWait(state, "bank/withdraw", jsonData)
 	if err != nil {
 		fmt.Printf("Error depositing item: %v\n", err)
 		return err
@@ -473,6 +524,22 @@ func timothyLoop(currentCharacter *CharacterState) error {
 	}
 }
 
+func mikeLoop(currentCharacter *CharacterState) error {
+	for {
+		dumpAtBank(currentCharacter)
+		withdrawItemAtBank(currentCharacter, "gudgeon", 100)
+		err := moveToCooking(currentCharacter)
+		if err != nil {
+			fmt.Printf("Failed to move to kitchen: %v\n", err)
+			return err
+		}
+		err = craftUntil(currentCharacter, "cooked_gudgeon", 100)
+		if err != nil {
+			return err
+		}
+	}
+}
+
 func main() {
 	characterMap := make(map[string]CharacterState)
 	characterMap["squidward"] = CharacterState{Name: "squidward"}
@@ -480,6 +547,7 @@ func main() {
 	squidwardState := CharacterState{Name: "squidward"}
 	lilyState := CharacterState{Name: "lily"}
 	timothyState := CharacterState{Name: "timothy"}
+	mikeState := CharacterState{Name: "mike"}
 
 	go func() {
 		err := chadLoop(&chadState)
@@ -504,6 +572,12 @@ func main() {
 		err := timothyLoop(&timothyState)
 		if err != nil {
 			fmt.Printf("Failed to timothy loop: %v\n", err)
+		}
+	}()
+	go func() {
+		err := mikeLoop(&mikeState)
+		if err != nil {
+			fmt.Printf("Failed to mike loop: %v\n", err)
 		}
 	}()
 	var wg = sync.WaitGroup{}
