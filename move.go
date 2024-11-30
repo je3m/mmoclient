@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 )
 
@@ -23,6 +22,7 @@ var locations = map[string]MoveRequest{
 	"Gudgeon":               MoveRequest{5, 2},
 	"Cooking":               MoveRequest{1, 1},
 	"WeaponCraftingStation": MoveRequest{2, 1},
+	"Alchemy":               MoveRequest{2, 3},
 }
 
 func move(state *CharacterState, location string) error {
@@ -30,21 +30,21 @@ func move(state *CharacterState, location string) error {
 	// Marshal the request body to JSON
 	requestBody, err := json.Marshal(destination)
 	if err != nil {
-		fmt.Printf("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body:", "error", err)
 		os.Exit(1)
 	}
 
 	_, err = performActionAndWait(state, "move", requestBody)
 
 	if err != nil {
-		var responseCodeError *ResponseCodeError
+		var responseCodeError ResponseCodeError
 		if errors.As(err, &responseCodeError) {
 			if responseCodeError.code == CodeCharacterAlreadyMap {
 				// we are already here so it's fine
 				return nil
 			}
 		}
-		fmt.Printf("Failed to move to %s at coords (%v, %v)", location, destination.X, destination.Y)
+		state.Logger.Error("Failed to move", "location", location, "x", destination.X, "y", destination.Y)
 		return err
 	}
 	return nil
@@ -87,4 +87,8 @@ func moveToGudgeon(state *CharacterState) error {
 
 func moveToCooking(state *CharacterState) error {
 	return move(state, "Cooking")
+}
+
+func moveToAlchemy(state *CharacterState) error {
+	return move(state, "Alchemy")
 }
