@@ -78,5 +78,5 @@ func moveToGudgeon(state *CharacterState) error {
 }
 
 func moveToCooking(state *CharacterState) error {
-	return move(state, "Kitchen")
+	return move(state, "Cooking")
 }

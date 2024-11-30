@@ -85,7 +85,7 @@ type CharacterState struct {
 }
 
 // I think go makes you do all this shit manually :c
-func (state CharacterState) updateInventory(resp *ActionResponse) {
+func (state *CharacterState) updateInventory(resp *ActionResponse) {
 	state.Inventory = nil
 	for _, slot := range resp.Data.Character.Inventory {
 		state.Inventory = append(state.Inventory, slot)
