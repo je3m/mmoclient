@@ -12,17 +12,18 @@ type MoveRequest struct {
 }
 
 var locations = map[string]MoveRequest{
-	"AshTreeForest":         MoveRequest{-1, 0},
-	"CopperMine":            MoveRequest{2, 0},
-	"IronMine":              MoveRequest{1, 7},
-	"Bank":                  MoveRequest{4, 1},
-	"Spruce":                MoveRequest{2, 6},
-	"Sunflower":             MoveRequest{2, 2},
-	"Shrimp":                MoveRequest{5, 2},
-	"Gudgeon":               MoveRequest{5, 2},
-	"Cooking":               MoveRequest{1, 1},
-	"WeaponCraftingStation": MoveRequest{2, 1},
-	"Alchemy":               MoveRequest{2, 3},
+	"AshTreeForest":         {-1, 0},
+	"CopperMine":            {2, 0},
+	"IronMine":              {1, 7},
+	"Bank":                  {4, 1},
+	"Spruce":                {2, 6},
+	"Sunflower":             {2, 2},
+	"Shrimp":                {5, 2},
+	"Gudgeon":               {5, 2},
+	"Cooking":               {1, 1},
+	"WeaponCraftingStation": {2, 1},
+	"Alchemy":               {2, 3},
+	"Chicken":               {0, 1},
 }
 
 func move(state *CharacterState, location string) error {
@@ -91,4 +92,8 @@ func moveToCooking(state *CharacterState) error {
 
 func moveToAlchemy(state *CharacterState) error {
 	return move(state, "Alchemy")
+}
+
+func moveToChicken(state *CharacterState) error {
+	return move(state, "Chicken")
 }

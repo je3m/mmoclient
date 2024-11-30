@@ -335,96 +335,6 @@ func getInventoryFull(state *CharacterState) bool {
 	return state.InventoryMaxItems <= count
 }
 
-func squidwardLoop(currentCharacter *CharacterState) error {
-	for {
-		dumpAtBank(currentCharacter)
-
-		err := moveToIronMine(currentCharacter)
-		if err != nil {
-			os.Exit(1)
-		}
-
-		err = gatherUntil(currentCharacter, "iron_ore", 100)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func chadLoop(currentCharacter *CharacterState) error {
-	for {
-		dumpAtBank(currentCharacter)
-
-		err := moveToSpruce(currentCharacter)
-		if err != nil {
-			return err
-		}
-		err = gatherUntil(currentCharacter, "spruce_wood", 100)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func lilyLoop(currentCharacter *CharacterState) error {
-	for {
-		dumpAtBank(currentCharacter)
-
-		err := withdrawItemAtBank(currentCharacter, "sunflower", 100)
-		if err != nil {
-			return err
-		}
-
-		err = moveToAlchemy(currentCharacter)
-		if err != nil {
-			currentCharacter.Logger.Warn("Failed to move to sunflower: %v\n", err)
-			return err
-		}
-
-		err = craftUntil(currentCharacter, "small_health_potion", 30)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func timothyLoop(currentCharacter *CharacterState) error {
-	for {
-		dumpAtBank(currentCharacter)
-
-		err := moveToShrimp(currentCharacter)
-		if err != nil {
-			currentCharacter.Logger.Warn("Failed to move to shrimp: %v\n", err)
-			return err
-		}
-		err = gatherUntil(currentCharacter, "shrimp", 100)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func mikeLoop(currentCharacter *CharacterState) error {
-	for {
-		dumpAtBank(currentCharacter)
-
-		err := withdrawItemAtBank(currentCharacter, "shrimp", 100)
-		if err != nil {
-			return err
-		}
-
-		err = moveToCooking(currentCharacter)
-		if err != nil {
-			currentCharacter.Logger.Error("Failed to move to kitchen", "error", err)
-			return err
-		}
-		err = craftUntil(currentCharacter, "cooked_shrimp", 100)
-		if err != nil {
-			return err
-		}
-	}
-}
-
 func setApiToken() {
 	api_tok, err := os.ReadFile("token.txt")
 	if err != nil {
@@ -464,20 +374,20 @@ func main() {
 		}
 
 	}
-	go func() {
-		chadState := stateRefs["chad"]
-		err := chadLoop(chadState)
-		if err != nil {
-			chadState.Logger.Error("Failed to chad loop: %v\n", err)
-		}
-	}()
-	go func() {
-		squidwardState := stateRefs["squidward"]
-		err := squidwardLoop(squidwardState)
-		if err != nil {
-			squidwardState.Logger.Error("Failed to squward loop: %v\n", err)
-		}
-	}()
+	//go func() {
+	//	chadState := stateRefs["chad"]
+	//	err := chadLoop(chadState)
+	//	if err != nil {
+	//		chadState.Logger.Error("Failed to chad loop: %v\n", err)
+	//	}
+	//}()
+	//go func() {
+	//	squidwardState := stateRefs["squidward"]
+	//	err := squidwardLoop(squidwardState)
+	//	if err != nil {
+	//		squidwardState.Logger.Error("Failed to squward loop: %v\n", err)
+	//	}
+	//}()
 	go func() {
 		lilyState := stateRefs["lily"]
 		err := lilyLoop(lilyState)
@@ -485,22 +395,22 @@ func main() {
 			lilyState.Logger.Error("Failed to lily loop: %v\n", err)
 		}
 	}()
-
-	go func() {
-		timothyState := stateRefs["timothy"]
-		err := timothyLoop(timothyState)
-		if err != nil {
-			timothyState.Logger.Error("Failed to timothy loop: %v\n", err)
-		}
-	}()
-
-	go func() {
-		mikeState := stateRefs["mike"]
-		err := mikeLoop(mikeState)
-		if err != nil {
-			mikeState.Logger.Error("Failed to mike loop: %v\n", err)
-		}
-	}()
+	//
+	//go func() {
+	//	timothyState := stateRefs["timothy"]
+	//	err := timothyLoop(timothyState)
+	//	if err != nil {
+	//		timothyState.Logger.Error("Failed to timothy loop: %v\n", err)
+	//	}
+	//}()
+	//
+	//go func() {
+	//	mikeState := stateRefs["mike"]
+	//	err := mikeLoop(mikeState)
+	//	if err != nil {
+	//		mikeState.Logger.Error("Failed to mike loop: %v\n", err)
+	//	}
+	//}()
 
 	var wg = sync.WaitGroup{}
 	wg.Add(1)
