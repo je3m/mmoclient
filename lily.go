@@ -1,20 +1,20 @@
 package main
 
-func lilyLoop(currentCharacter *CharacterState) error {
+func lilyLoop(state *CharacterState) error {
+
 	for {
-		dumpAtBank(currentCharacter)
+		dumpAtBank(state)
 
-		err := withdrawItemAtBank(currentCharacter, "cooked_gudgeon", 30)
+		err := withdrawItemAtBank(state, "cooked_gudgeon", 30)
 		if err != nil {
 			return err
 		}
 
-		err = moveToChicken(currentCharacter)
+		err = moveToChicken(state)
 		if err != nil {
 			return err
 		}
-		err = fight(currentCharacter)
-		err = craftUntil(currentCharacter, "small_health_potion", 30)
+		err = fightUntilLowInventory(state, "cooked_gudgeon", 75)
 		if err != nil {
 			return err
 		}

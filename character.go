@@ -99,4 +99,6 @@ func (state *CharacterState) updateInventory(resp *ActionResponse) {
 		state.Inventory = append(state.Inventory, slot)
 	}
 	state.InventoryMaxItems = resp.Data.Character.InventoryMaxItems
+	state.Hp = resp.Data.Character.Hp
+	state.MaxHp = resp.Data.Character.MaxHp
 }

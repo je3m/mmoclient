@@ -142,7 +142,9 @@ func getGameStatus() ([]CharacterState, error) {
 }
 
 func fight(state *CharacterState) {
+	state.Logger.Debug("fighting", "start_hp", state.Hp)
 	performActionAndWait(state, "fight", []byte{})
+	state.Logger.Debug("fighting", "end_hp", state.Hp)
 }
 
 func rest(state *CharacterState) {
@@ -224,6 +226,57 @@ func craftUntil(state *CharacterState, item string, quantity int) error {
 	return nil
 }
 
+// heal as much as possible without waste
+func healEfficient(state *CharacterState, healing_item string, amount_heal int) error {
+	numHave := getItemInventoryQty(state, healing_item)
+	hpToHeal := state.MaxHp - state.Hp
+	numNeeded := hpToHeal / amount_heal
+
+	numToConsume := min(numNeeded, numHave)
+	if numToConsume > 0 {
+		state.Logger.Info("healing", "start_hp", state.Hp)
+
+		err := useItem(state, healing_item, numToConsume)
+		if err != nil {
+			return err
+		}
+		state.Logger.Info("healing", "end_hp", state.Hp)
+	}
+
+	return nil
+}
+
+// fight until out of hp and healing item
+func fightUntilLowInventory(state *CharacterState, healing_item string, amount_heal int) error {
+	numHealItem := getItemInventoryQty(state, healing_item)
+	fight_count := 0
+	state.Logger.Info("fight_forever",
+		"healing_item", healing_item)
+
+	for numHealItem > 0 {
+		err := healEfficient(state, healing_item, amount_heal)
+
+		if err != nil {
+			state.Logger.Error("Error healing", "error", err)
+			return err
+		}
+		if getInventoryFull(state) {
+			// no point in fighting bc we get no loot
+			return nil
+		}
+
+		fight(state)
+		fight_count++
+		numHealItem := getItemInventoryQty(state, healing_item)
+
+		state.Logger.Debug("progress made",
+			"action", "fighting",
+			"fights_won", fight_count,
+			"remaining", numHealItem)
+	}
+	return nil
+}
+
 func unequip(state *CharacterState, slot string) {
 	type UnequipRequest struct {
 		Slot string `json:"slot"`
@@ -268,6 +321,24 @@ func equipItem(state *CharacterState, code string, slot string) error {
 	_, err = performActionAndWait(state, "equip", jsonData)
 	if err != nil {
 		state.Logger.Error("Error equiping item: %v\n", err)
+		return err
+	}
+	return nil
+}
+
+func useItem(state *CharacterState, code string, quantity int) error {
+	type UseItemRequest struct {
+		Code     string `json:"code"`
+		Quantity int    `json:"quantity"`
+	}
+	jsonData, err := json.Marshal(UseItemRequest{code, quantity})
+	if err != nil {
+		state.Logger.Error("Error marshalling request body: %v\n", err)
+		os.Exit(1)
+	}
+	_, err = performActionAndWait(state, "use", jsonData)
+	if err != nil {
+		state.Logger.Error("Error using item", err)
 		return err
 	}
 	return nil
@@ -374,20 +445,20 @@ func main() {
 		}
 
 	}
-	//go func() {
-	//	chadState := stateRefs["chad"]
-	//	err := chadLoop(chadState)
-	//	if err != nil {
-	//		chadState.Logger.Error("Failed to chad loop: %v\n", err)
-	//	}
-	//}()
-	//go func() {
-	//	squidwardState := stateRefs["squidward"]
-	//	err := squidwardLoop(squidwardState)
-	//	if err != nil {
-	//		squidwardState.Logger.Error("Failed to squward loop: %v\n", err)
-	//	}
-	//}()
+	go func() {
+		chadState := stateRefs["chad"]
+		err := chadLoop(chadState)
+		if err != nil {
+			chadState.Logger.Error("Failed to chad loop: %v\n", err)
+		}
+	}()
+	go func() {
+		squidwardState := stateRefs["squidward"]
+		err := squidwardLoop(squidwardState)
+		if err != nil {
+			squidwardState.Logger.Error("Failed to squward loop: %v\n", err)
+		}
+	}()
 	go func() {
 		lilyState := stateRefs["lily"]
 		err := lilyLoop(lilyState)
@@ -395,22 +466,22 @@ func main() {
 			lilyState.Logger.Error("Failed to lily loop: %v\n", err)
 		}
 	}()
-	//
-	//go func() {
-	//	timothyState := stateRefs["timothy"]
-	//	err := timothyLoop(timothyState)
-	//	if err != nil {
-	//		timothyState.Logger.Error("Failed to timothy loop: %v\n", err)
-	//	}
-	//}()
-	//
-	//go func() {
-	//	mikeState := stateRefs["mike"]
-	//	err := mikeLoop(mikeState)
-	//	if err != nil {
-	//		mikeState.Logger.Error("Failed to mike loop: %v\n", err)
-	//	}
-	//}()
+
+	go func() {
+		timothyState := stateRefs["timothy"]
+		err := timothyLoop(timothyState)
+		if err != nil {
+			timothyState.Logger.Error("Failed to timothy loop: %v\n", err)
+		}
+	}()
+
+	go func() {
+		mikeState := stateRefs["mike"]
+		err := mikeLoop(mikeState)
+		if err != nil {
+			mikeState.Logger.Error("Failed to mike loop: %v\n", err)
+		}
+	}()
 
 	var wg = sync.WaitGroup{}
 	wg.Add(1)
