@@ -175,9 +175,6 @@ func unequip(state *CharacterState, slot string) {
 	performActionAndWait(state, "unequip", jsonData)
 }
 
-func moveWeaponCraftStation(state *CharacterState) {
-	move(state, 2, 1)
-}
 func craftItem(state *CharacterState, code string) error {
 	type CraftItemRequest struct {
 		Code string `json:"code"`
