@@ -3,8 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"sync"
@@ -43,7 +43,7 @@ func performActionAndWait(state *CharacterState, actionName string, actionData [
 	// Create the HTTP request
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(actionData))
 	if err != nil {
-		fmt.Printf("Error creating request: %v\n", err)
+		state.Logger.Error("Error creating request: %v\n", err)
 		return nil, err
 	}
 
@@ -56,7 +56,7 @@ func performActionAndWait(state *CharacterState, actionName string, actionData [
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("Error making request: %v\n", err)
+		state.Logger.Error("Error making request: %v\n", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -64,26 +64,28 @@ func performActionAndWait(state *CharacterState, actionName string, actionData [
 	// Read and display the response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
+		state.Logger.Error("Error reading response body\n", err)
 		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("Request failed with status: %s\n", ArtifactsResponseCode(resp.StatusCode))
-		return nil, err
+		state.Logger.Warn("Request failed with status",
+			"action_name", actionName,
+			"response_code", ArtifactsResponseCode(resp.StatusCode))
+		return nil, ResponseCodeError{ArtifactsResponseCode(resp.StatusCode)}
 	}
 
 	err = json.Unmarshal(body, &response)
 
 	if err != nil {
-		fmt.Printf("Error parsing response: %v\n", err)
+		state.Logger.Error("Error parsing response: %v\n", err)
 		return nil, err
 	}
 
 	state.updateInventory(response)
 
 	cooldown := response.Data.Cooldown.RemainingSeconds
-	fmt.Printf("Waiting %v seconds to finish action %s\n", cooldown, actionName)
+	state.Logger.Debug("Waiting finish action", "cooldown", cooldown, "action", actionName)
 	time.Sleep(time.Duration(cooldown) * time.Second)
 
 	return response, err
@@ -115,24 +117,30 @@ func getItemInventoryQty(state *CharacterState, itemName string) int {
 func gatherUntil(state *CharacterState, item string, quantity int) error {
 	numberRemaining := 1
 
+	state.Logger.Info("gathering_until",
+		"quantity", quantity,
+		"item", item)
+
 	for numberRemaining > 0 {
 		if getInventoryFull(state) {
-			fmt.Printf("Inventory full. returning early\n")
+			state.Logger.Warn("Inventory full. returning early\n")
 			break
 		}
 
 		resp, err := performActionAndWait(state, "gathering", []byte{})
 		if err != nil {
-			fmt.Printf("Error making request: %v\n", err)
+			state.Logger.Error("Error making request", err)
 			return err
 		}
 		numberHas := getItemInventoryQty(&resp.Data.Character, item)
 		numberRemaining = quantity - numberHas
 
-		fmt.Printf(
-			"Have: %v\n"+
-				"Need: %v\n"+
-				"Remaining: %v\n", numberHas, quantity, numberRemaining)
+		state.Logger.Debug("progress made",
+			"action", "gathering",
+			"item", item,
+			"have", numberHas,
+			"need", quantity,
+			"remaining", numberRemaining)
 
 	}
 	return nil
@@ -142,21 +150,26 @@ func gatherUntil(state *CharacterState, item string, quantity int) error {
 func craftUntil(state *CharacterState, item string, quantity int) error {
 	numberRemaining := 1
 
+	state.Logger.Info("craft_until",
+		"quantity", quantity,
+		"item", item)
+
 	for numberRemaining > 0 {
 		err := craftItem(state, item)
 
 		if err != nil {
-			fmt.Printf("Error crafting item: %v\n", err)
+			state.Logger.Error("Error crafting item: %v\n", err)
 			return err
 		}
 		numberHas := getItemInventoryQty(state, item)
 		numberRemaining = quantity - numberHas
 
-		fmt.Printf(
-			"Have: %v\n"+
-				"Need: %v\n"+
-				"Remaining: %v\n", numberHas, quantity, numberRemaining)
-
+		state.Logger.Debug("progress made",
+			"action", "gathering",
+			"item", item,
+			"have", numberHas,
+			"need", quantity,
+			"remaining", numberRemaining)
 	}
 	return nil
 }
@@ -168,7 +181,7 @@ func unequip(state *CharacterState, slot string) {
 
 	jsonData, err := json.Marshal(UnequipRequest{slot})
 	if err != nil {
-		fmt.Printf("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -181,12 +194,12 @@ func craftItem(state *CharacterState, code string) error {
 	}
 	jsonData, err := json.Marshal(CraftItemRequest{code})
 	if err != nil {
-		fmt.Printf("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
 	}
 	_, err = performActionAndWait(state, "crafting", jsonData)
 	if err != nil {
-		fmt.Printf("Error making crafting item: %v\n", err)
+		state.Logger.Error("Error making crafting item: %v\n", err)
 		return err
 	}
 	return nil
@@ -199,12 +212,12 @@ func equipItem(state *CharacterState, code string, slot string) error {
 	}
 	jsonData, err := json.Marshal(EquipItemRequest{code, slot})
 	if err != nil {
-		fmt.Printf("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
 	}
 	_, err = performActionAndWait(state, "equip", jsonData)
 	if err != nil {
-		fmt.Printf("Error equiping item: %v\n", err)
+		state.Logger.Error("Error equiping item: %v\n", err)
 		return err
 	}
 	return nil
@@ -217,12 +230,12 @@ func depositItemAtBank(state *CharacterState, code string, qty int) error {
 	}
 	jsonData, err := json.Marshal(DepositItemRequest{code, qty})
 	if err != nil {
-		fmt.Printf("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body", err)
 		os.Exit(1)
 	}
 	_, err = performActionAndWait(state, "bank/deposit", jsonData)
 	if err != nil {
-		fmt.Printf("Error depositing item: %v\n", err)
+		state.Logger.Error("Error depositing item", "reason", err)
 		return err
 	}
 	return nil
@@ -234,25 +247,32 @@ func withdrawItemAtBank(state *CharacterState, code string, qty int) error {
 	}
 	jsonData, err := json.Marshal(WithdrawItemRequest{code, qty})
 	if err != nil {
-		fmt.Printf("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
 	}
 	_, err = performActionAndWait(state, "bank/withdraw", jsonData)
 	if err != nil {
-		fmt.Printf("Error depositing item: %v\n", err)
+		state.Logger.Warn("Error withdrawing item: %v\n", err)
 		return err
 	}
 	return nil
 }
 
-func dumpAtBank(state *CharacterState) {
-	moveToBank(state)
+func dumpAtBank(state *CharacterState) error {
+	err := moveToBank(state)
+	if err != nil {
+		return err
+	}
 
 	for _, item := range state.Inventory {
 		if item.Quantity > 0 {
-			depositItemAtBank(state, item.Code, item.Quantity)
+			err := depositItemAtBank(state, item.Code, item.Quantity)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func getInventoryFull(state *CharacterState) bool {
@@ -302,7 +322,7 @@ func lilyLoop(currentCharacter *CharacterState) error {
 
 		err := moveToSunflower(currentCharacter)
 		if err != nil {
-			fmt.Printf("Failed to move to sunflower: %v\n", err)
+			currentCharacter.Logger.Warn("Failed to move to sunflower: %v\n", err)
 			return err
 		}
 		err = gatherUntil(currentCharacter, "sunflower", 100)
@@ -318,7 +338,7 @@ func timothyLoop(currentCharacter *CharacterState) error {
 
 		err := moveToShrimp(currentCharacter)
 		if err != nil {
-			fmt.Printf("Failed to move to shrimp: %v\n", err)
+			currentCharacter.Logger.Warn("Failed to move to shrimp: %v\n", err)
 			return err
 		}
 		err = gatherUntil(currentCharacter, "shrimp", 100)
@@ -331,10 +351,15 @@ func timothyLoop(currentCharacter *CharacterState) error {
 func mikeLoop(currentCharacter *CharacterState) error {
 	for {
 		dumpAtBank(currentCharacter)
-		withdrawItemAtBank(currentCharacter, "gudgeon", 100)
-		err := moveToCooking(currentCharacter)
+		err := withdrawItemAtBank(currentCharacter, "gudgeon", 100)
+
 		if err != nil {
-			fmt.Printf("Failed to move to kitchen: %v\n", err)
+			return err
+		}
+
+		err = moveToCooking(currentCharacter)
+		if err != nil {
+			currentCharacter.Logger.Warn("Failed to move to kitchen: %v\n", err)
 			return err
 		}
 		err = craftUntil(currentCharacter, "cooked_gudgeon", 100)
@@ -347,52 +372,73 @@ func mikeLoop(currentCharacter *CharacterState) error {
 func setApiToken() {
 	api_tok, err := os.ReadFile("token.txt")
 	if err != nil {
-		fmt.Printf("Failed to read API token: %v\n", err)
+		slog.Error("Failed to read API token: %v\n", err)
 		os.Exit(1)
 	}
 	API_TOKEN = string(api_tok)
 }
+func setupLogging(states []*CharacterState) error {
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+
+	logger := slog.New(handler)
+
+	for _, state := range states {
+		state.Logger = logger.WithGroup(state.Name)
+	}
+	return nil
+}
 
 func main() {
-	setApiToken()
-
 	chadState := CharacterState{Name: "chad"}
 	squidwardState := CharacterState{Name: "squidward"}
 	lilyState := CharacterState{Name: "lily"}
 	timothyState := CharacterState{Name: "timothy"}
 	mikeState := CharacterState{Name: "mike"}
 
+	states := []*CharacterState{&chadState, &squidwardState, &lilyState, &timothyState, &mikeState}
+
+	err := setupLogging(states)
+	if err != nil {
+		println("Failed to setup logging: %v\n", err)
+		os.Exit(1)
+	}
+
+	setApiToken()
+
 	go func() {
 		err := chadLoop(&chadState)
 		if err != nil {
-			fmt.Printf("Failed to chad loop: %v\n", err)
+			chadState.Logger.Error("Failed to chad loop: %v\n", err)
 		}
 	}()
 	go func() {
 		err := squidwardLoop(&squidwardState)
 		if err != nil {
-			fmt.Printf("Failed to squward loop: %v\n", err)
+			squidwardState.Logger.Error("Failed to squward loop: %v\n", err)
 		}
 	}()
 	go func() {
 		err := lilyLoop(&lilyState)
 		if err != nil {
-			fmt.Printf("Failed to lily loop: %v\n", err)
+			lilyState.Logger.Error("Failed to lily loop: %v\n", err)
 		}
 	}()
 
 	go func() {
 		err := timothyLoop(&timothyState)
 		if err != nil {
-			fmt.Printf("Failed to timothy loop: %v\n", err)
+			timothyState.Logger.Error("Failed to timothy loop: %v\n", err)
 		}
 	}()
 	go func() {
 		err := mikeLoop(&mikeState)
 		if err != nil {
-			fmt.Printf("Failed to mike loop: %v\n", err)
+			mikeState.Logger.Error("Failed to mike loop: %v\n", err)
 		}
 	}()
+
 	var wg = sync.WaitGroup{}
 	wg.Add(1)
 	defer wg.Wait()
