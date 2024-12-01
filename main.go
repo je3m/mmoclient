@@ -267,7 +267,7 @@ func fightUntilLowInventory(state *CharacterState, healing_item string, amount_h
 
 		fight(state)
 		fight_count++
-		numHealItem := getItemInventoryQty(state, healing_item)
+		numHealItem = getItemInventoryQty(state, healing_item)
 
 		state.Logger.Debug("progress made",
 			"action", "fighting",
