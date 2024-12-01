@@ -10,11 +10,7 @@ func (state *CharacterState) lilyLoop() error {
 			return err
 		}
 
-		err = state.moveToChicken()
-		if err != nil {
-			return err
-		}
-		err = state.fightUntilLowInventory("cooked_gudgeon", 75)
+		err = fightWorthyEnemy(state, "cooked_gudgeon", 75)
 		if err != nil {
 			return err
 		}

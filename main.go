@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -67,6 +68,82 @@ type MonsterResponse struct {
 var MonsterDB *MonsterResponse
 
 var API_TOKEN = ""
+
+type MapResponse struct {
+	Data []struct {
+		Name    string `json:"name"`
+		Skin    string `json:"skin"`
+		X       int    `json:"x"`
+		Y       int    `json:"y"`
+		Content struct {
+			Type string `json:"type"`
+			Code string `json:"code"`
+		} `json:"content"`
+	} `json:"data"`
+	Total int `json:"total"`
+	Page  int `json:"page"`
+	Size  int `json:"size"`
+	Pages int `json:"pages"`
+}
+
+func getMonsterLocation(state *CharacterState, monsterName string) (*MoveRequest, error) {
+	response := new(MapResponse)
+	retval := new(MoveRequest)
+
+	// Define the endpoint and token
+	apiURL := "https://api.artifactsmmo.com/maps"
+
+	u, _ := url.Parse(apiURL)
+
+	q := u.Query()
+	q.Add("content_code", monsterName)
+	q.Add("content_type", "monster")
+
+	u.RawQuery = q.Encode()
+
+	// Create the HTTP request
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set headers
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read and display the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, ResponseCodeError{ArtifactsResponseCode(resp.StatusCode)}
+	}
+
+	err = json.Unmarshal(body, &response)
+
+	if err != nil {
+		slog.Error("Error parsing response: %v\n", err)
+		return nil, err
+	}
+
+	for _, spot := range response.Data {
+		// TODO: go to closest
+		retval.X = spot.X
+		retval.Y = spot.Y
+	}
+	return retval, nil
+}
 
 // perform given action and block until cooldown is up
 func (state *CharacterState) performActionAndWait(actionName string, actionData []byte) (*ActionResponse, error) {
@@ -305,17 +382,45 @@ func (state *CharacterState) craftUntil(item string, quantity int) error {
 }
 
 func findWorthyEnemy(state *CharacterState) string {
-	myLevel := state.Level
+	maxLevel := state.Level - 1
 	mostWorthy := ""
 	highestLevel := 0
 
 	for _, monster := range MonsterDB.Data {
-		if monster.Level < myLevel && monster.Level > highestLevel {
-			mostWorthy = monster.Name
+		if monster.Level < maxLevel && monster.Level > highestLevel {
+			mostWorthy = monster.Code
 			highestLevel = monster.Level
 		}
 	}
+
+	state.Logger.Debug(mostWorthy + " deemed worthy")
+
 	return mostWorthy
+}
+
+func fightWorthyEnemy(state *CharacterState, healing_item string, heal_amount int) error {
+	//enemy := findWorthyEnemy(state)
+	location, err := getMonsterLocation(state, "yellow_slime")
+	if err != nil {
+		return err
+	}
+
+	jsonData, err := json.Marshal(location)
+	if err != nil {
+		state.Logger.Error("Error marshalling request body: %v\n", err)
+		os.Exit(1)
+	}
+
+	state.Logger.Debug("moving", "location", location)
+	_, err = performActionAndWait(state, "move", jsonData)
+	if err != nil {
+		return err
+	}
+	err = fightUntilLowInventory(state, healing_item, heal_amount)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // heal as much as possible without waste
@@ -325,10 +430,10 @@ func (state *CharacterState) healEfficient(healing_item string, amount_heal int)
 	numNeeded := hpToHeal / amount_heal
 
 	numToConsume := min(numNeeded, numHave)
-	if numToConsume > 0 {
+	if hpToHeal > 0 { //TODO: hack
 		state.Logger.Info("healing", "start_hp", state.Hp)
 
-		err := state.useItem(healing_item, numToConsume)
+		err := useItem(state, healing_item, numToConsume+1) //TODO: +1 is bad hack to keep killing yellow slimes overnight
 		if err != nil {
 			return err
 		}
