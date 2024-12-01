@@ -1,17 +1,15 @@
 package main
 
-import "os"
-
-func squidwardLoop(currentCharacter *CharacterState) error {
+func (state *CharacterState) squidwardLoop() error {
 	for {
-		dumpAtBank(currentCharacter)
+		state.dumpAtBank()
 
-		err := moveToIronMine(currentCharacter)
+		err := state.moveToIronMine()
 		if err != nil {
-			os.Exit(1)
+			return err
 		}
 
-		err = gatherUntil(currentCharacter, "iron_ore", 100)
+		err = state.gatherUntil("iron_ore", 100)
 		if err != nil {
 			return err
 		}

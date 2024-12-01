@@ -1,15 +1,15 @@
 package main
 
-func timothyLoop(currentCharacter *CharacterState) error {
+func (state *CharacterState) timothyLoop() error {
 	for {
-		dumpAtBank(currentCharacter)
+		state.dumpAtBank()
 
-		err := moveToShrimp(currentCharacter)
+		err := state.moveToShrimp()
 		if err != nil {
-			currentCharacter.Logger.Warn("Failed to move to shrimp: %v\n", err)
+			state.Logger.Warn("Failed to move to shrimp: %v\n", err)
 			return err
 		}
-		err = gatherUntil(currentCharacter, "shrimp", 100)
+		err = state.gatherUntil("shrimp", 100)
 		if err != nil {
 			return err
 		}

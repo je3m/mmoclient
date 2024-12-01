@@ -1,14 +1,14 @@
 package main
 
-func chadLoop(currentCharacter *CharacterState) error {
+func (state *CharacterState) chadLoop() error {
 	for {
-		dumpAtBank(currentCharacter)
+		state.dumpAtBank()
 
-		err := moveToSpruce(currentCharacter)
+		err := state.moveToSpruce()
 		if err != nil {
 			return err
 		}
-		err = gatherUntil(currentCharacter, "spruce_wood", 100)
+		err = state.gatherUntil("spruce_wood", 100)
 		if err != nil {
 			return err
 		}
