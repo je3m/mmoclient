@@ -4,17 +4,17 @@ func (state *CharacterState) mikeLoop() error {
 	for {
 		state.dumpAtBank()
 
-		err := state.withdrawItemAtBank("shrimp", 100)
+		err := withdrawItemAtBank(currentCharacter, "ash_wood", 100)
 		if err != nil {
 			return err
 		}
 
-		err = state.moveToCooking()
+		err = moveWoodCraftStation(currentCharacter)
 		if err != nil {
-			state.Logger.Error("Failed to move to kitchen", "error", err)
+			currentCharacter.Logger.Error("Failed to move to woodcraft", "error", err)
 			return err
 		}
-		err = state.craftUntil("cooked_shrimp", 100)
+		err = craftUntil(currentCharacter, "ash_plank", 100/8)
 		if err != nil {
 			return err
 		}

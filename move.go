@@ -24,6 +24,7 @@ var locations = map[string]MoveRequest{
 	"WeaponCraftingStation": {2, 1},
 	"Alchemy":               {2, 3},
 	"Chicken":               {0, 1},
+	"WoodCraftingStation":   {-2, -3},
 }
 
 func (state *CharacterState) move(location string) error {
@@ -53,6 +54,12 @@ func (state *CharacterState) move(location string) error {
 
 func (state *CharacterState) moveWeaponCraftStation() error {
 	return state.move("WeaponCraftingStation")
+func moveWoodCraftStation(state *CharacterState) error {
+	return move(state, "WoodCraftingStation")
+}
+
+func moveWeaponCraftStation(state *CharacterState) error {
+	return move(state, "WeaponCraftingStation")
 }
 func (state *CharacterState) moveToAshTreeForest() error {
 	return state.move("AshTreeForest")
