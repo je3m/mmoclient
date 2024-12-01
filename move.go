@@ -26,7 +26,7 @@ var locations = map[string]MoveRequest{
 	"Chicken":               {0, 1},
 }
 
-func move(state *CharacterState, location string) error {
+func (state *CharacterState) move(location string) error {
 	destination := locations[location]
 	// Marshal the request body to JSON
 	requestBody, err := json.Marshal(destination)
@@ -35,7 +35,7 @@ func move(state *CharacterState, location string) error {
 		os.Exit(1)
 	}
 
-	_, err = performActionAndWait(state, "move", requestBody)
+	_, err = state.performActionAndWait("move", requestBody)
 
 	if err != nil {
 		var responseCodeError ResponseCodeError
@@ -51,49 +51,49 @@ func move(state *CharacterState, location string) error {
 	return nil
 }
 
-func moveWeaponCraftStation(state *CharacterState) error {
-	return move(state, "WeaponCraftingStation")
+func (state *CharacterState) moveWeaponCraftStation() error {
+	return state.move("WeaponCraftingStation")
 }
-func moveToAshTreeForest(state *CharacterState) error {
-	return move(state, "AshTreeForest")
-}
-
-func moveToCopperMine(state *CharacterState) error {
-	return move(state, "CopperMine")
+func (state *CharacterState) moveToAshTreeForest() error {
+	return state.move("AshTreeForest")
 }
 
-func moveToIronMine(state *CharacterState) error {
-	return move(state, "IronMine")
+func (state *CharacterState) moveToCopperMine() error {
+	return state.move("CopperMine")
 }
 
-func moveToBank(state *CharacterState) error {
-	return move(state, "Bank")
+func (state *CharacterState) moveToIronMine() error {
+	return state.move("IronMine")
 }
 
-func moveToSpruce(state *CharacterState) error {
-	return move(state, "Spruce")
+func (state *CharacterState) moveToBank() error {
+	return state.move("Bank")
 }
 
-func moveToSunflower(state *CharacterState) error {
-	return move(state, "Sunflower")
+func (state *CharacterState) moveToSpruce() error {
+	return state.move("Spruce")
 }
 
-func moveToShrimp(state *CharacterState) error {
-	return move(state, "Shrimp")
+func (state *CharacterState) moveToSunflower() error {
+	return state.move("Sunflower")
 }
 
-func moveToGudgeon(state *CharacterState) error {
-	return move(state, "Gudgeon")
+func (state *CharacterState) moveToShrimp() error {
+	return state.move("Shrimp")
 }
 
-func moveToCooking(state *CharacterState) error {
-	return move(state, "Cooking")
+func (state *CharacterState) moveToGudgeon() error {
+	return state.move("Gudgeon")
 }
 
-func moveToAlchemy(state *CharacterState) error {
-	return move(state, "Alchemy")
+func (state *CharacterState) moveToCooking() error {
+	return state.move("Cooking")
 }
 
-func moveToChicken(state *CharacterState) error {
-	return move(state, "Chicken")
+func (state *CharacterState) moveToAlchemy() error {
+	return state.move("Alchemy")
+}
+
+func (state *CharacterState) moveToChicken() error {
+	return state.move("Chicken")
 }

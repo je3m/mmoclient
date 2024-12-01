@@ -88,7 +88,7 @@ type CharacterState struct {
 	} `json:"inventory"`
 }
 
-func (state CharacterState) String() string {
+func (state *CharacterState) String() string {
 	return state.Name
 }
 

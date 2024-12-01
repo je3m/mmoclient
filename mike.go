@@ -1,20 +1,20 @@
 package main
 
-func mikeLoop(currentCharacter *CharacterState) error {
+func (state *CharacterState) mikeLoop() error {
 	for {
-		dumpAtBank(currentCharacter)
+		state.dumpAtBank()
 
-		err := withdrawItemAtBank(currentCharacter, "shrimp", 100)
+		err := state.withdrawItemAtBank("shrimp", 100)
 		if err != nil {
 			return err
 		}
 
-		err = moveToCooking(currentCharacter)
+		err = state.moveToCooking()
 		if err != nil {
-			currentCharacter.Logger.Error("Failed to move to kitchen", "error", err)
+			state.Logger.Error("Failed to move to kitchen", "error", err)
 			return err
 		}
-		err = craftUntil(currentCharacter, "cooked_shrimp", 100)
+		err = state.craftUntil("cooked_shrimp", 100)
 		if err != nil {
 			return err
 		}

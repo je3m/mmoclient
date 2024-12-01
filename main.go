@@ -38,7 +38,7 @@ type ActionResponse struct {
 var API_TOKEN = ""
 
 // perform given action and block until cooldown is up
-func performActionAndWait(state *CharacterState, actionName string, actionData []byte) (*ActionResponse, error) {
+func (state *CharacterState) performActionAndWait(actionName string, actionData []byte) (*ActionResponse, error) {
 	response := new(ActionResponse)
 
 	// Define the endpoint and token
@@ -141,21 +141,21 @@ func getGameStatus() ([]CharacterState, error) {
 	return response.Data, nil
 }
 
-func fight(state *CharacterState) {
+func (state *CharacterState) fight() {
 	state.Logger.Debug("fighting", "start_hp", state.Hp)
-	performActionAndWait(state, "fight", []byte{})
+	state.performActionAndWait("fight", []byte{})
 	state.Logger.Debug("fighting", "end_hp", state.Hp)
 }
 
 func rest(state *CharacterState) {
-	performActionAndWait(state, "rest", []byte{})
+	state.performActionAndWait("rest", []byte{})
 }
 
 func gathering(state *CharacterState) {
-	performActionAndWait(state, "gathering", []byte{})
+	state.performActionAndWait("gathering", []byte{})
 }
 
-func getItemInventoryQty(state *CharacterState, itemName string) int {
+func (state *CharacterState) getItemInventoryQty(itemName string) int {
 	inv := state.Inventory
 	for _, item := range inv {
 		if item.Code == itemName {
@@ -166,7 +166,7 @@ func getItemInventoryQty(state *CharacterState, itemName string) int {
 }
 
 // Perform gathering action until inventory contains at least <quantity> of item
-func gatherUntil(state *CharacterState, item string, quantity int) error {
+func (state *CharacterState) gatherUntil(item string, quantity int) error {
 	numberRemaining := 1
 
 	state.Logger.Info("gathering_until",
@@ -174,17 +174,17 @@ func gatherUntil(state *CharacterState, item string, quantity int) error {
 		"item", item)
 
 	for numberRemaining > 0 {
-		if getInventoryFull(state) {
+		if state.getInventoryFull() {
 			state.Logger.Warn("Inventory full. returning early\n")
 			break
 		}
 
-		resp, err := performActionAndWait(state, "gathering", []byte{})
+		resp, err := state.performActionAndWait("gathering", []byte{})
 		if err != nil {
 			state.Logger.Error("Error making request", err)
 			return err
 		}
-		numberHas := getItemInventoryQty(&resp.Data.Character, item)
+		numberHas := resp.Data.Character.getItemInventoryQty(item)
 		numberRemaining = quantity - numberHas
 
 		state.Logger.Debug("progress made",
@@ -199,7 +199,7 @@ func gatherUntil(state *CharacterState, item string, quantity int) error {
 }
 
 // Perform cooking action until inventory contains at least <quantity> of item
-func craftUntil(state *CharacterState, item string, quantity int) error {
+func (state *CharacterState) craftUntil(item string, quantity int) error {
 	numberRemaining := 1
 
 	state.Logger.Info("craft_until",
@@ -207,13 +207,13 @@ func craftUntil(state *CharacterState, item string, quantity int) error {
 		"item", item)
 
 	for numberRemaining > 0 {
-		err := craftItem(state, item)
+		err := state.craftItem(item)
 
 		if err != nil {
 			state.Logger.Error("Error crafting item: %v\n", err)
 			return err
 		}
-		numberHas := getItemInventoryQty(state, item)
+		numberHas := state.getItemInventoryQty(item)
 		numberRemaining = quantity - numberHas
 
 		state.Logger.Debug("progress made",
@@ -227,8 +227,8 @@ func craftUntil(state *CharacterState, item string, quantity int) error {
 }
 
 // heal as much as possible without waste
-func healEfficient(state *CharacterState, healing_item string, amount_heal int) error {
-	numHave := getItemInventoryQty(state, healing_item)
+func (state *CharacterState) healEfficient(healing_item string, amount_heal int) error {
+	numHave := state.getItemInventoryQty(healing_item)
 	hpToHeal := state.MaxHp - state.Hp
 	numNeeded := hpToHeal / amount_heal
 
@@ -236,7 +236,7 @@ func healEfficient(state *CharacterState, healing_item string, amount_heal int) 
 	if numToConsume > 0 {
 		state.Logger.Info("healing", "start_hp", state.Hp)
 
-		err := useItem(state, healing_item, numToConsume)
+		err := state.useItem(healing_item, numToConsume)
 		if err != nil {
 			return err
 		}
@@ -247,27 +247,27 @@ func healEfficient(state *CharacterState, healing_item string, amount_heal int) 
 }
 
 // fight until out of hp and healing item
-func fightUntilLowInventory(state *CharacterState, healing_item string, amount_heal int) error {
-	numHealItem := getItemInventoryQty(state, healing_item)
+func (state *CharacterState) fightUntilLowInventory(healing_item string, amount_heal int) error {
+	numHealItem := state.getItemInventoryQty(healing_item)
 	fight_count := 0
 	state.Logger.Info("fight_forever",
 		"healing_item", healing_item)
 
 	for numHealItem > 0 {
-		err := healEfficient(state, healing_item, amount_heal)
+		err := state.healEfficient(healing_item, amount_heal)
 
 		if err != nil {
 			state.Logger.Error("Error healing", "error", err)
 			return err
 		}
-		if getInventoryFull(state) {
+		if state.getInventoryFull() {
 			// no point in fighting bc we get no loot
 			return nil
 		}
 
-		fight(state)
+		state.fight()
 		fight_count++
-		numHealItem = getItemInventoryQty(state, healing_item)
+		numHealItem = state.getItemInventoryQty(healing_item)
 
 		state.Logger.Debug("progress made",
 			"action", "fighting",
@@ -277,7 +277,7 @@ func fightUntilLowInventory(state *CharacterState, healing_item string, amount_h
 	return nil
 }
 
-func unequip(state *CharacterState, slot string) {
+func (state *CharacterState) unequip(slot string) {
 	type UnequipRequest struct {
 		Slot string `json:"slot"`
 	}
@@ -288,10 +288,10 @@ func unequip(state *CharacterState, slot string) {
 		os.Exit(1)
 	}
 
-	performActionAndWait(state, "unequip", jsonData)
+	state.performActionAndWait("unequip", jsonData)
 }
 
-func craftItem(state *CharacterState, code string) error {
+func (state *CharacterState) craftItem(code string) error {
 	type CraftItemRequest struct {
 		Code string `json:"code"`
 	}
@@ -300,7 +300,7 @@ func craftItem(state *CharacterState, code string) error {
 		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
 	}
-	_, err = performActionAndWait(state, "crafting", jsonData)
+	_, err = state.performActionAndWait("crafting", jsonData)
 	if err != nil {
 		state.Logger.Error("Error making crafting item: %v\n", err)
 		return err
@@ -308,7 +308,7 @@ func craftItem(state *CharacterState, code string) error {
 	return nil
 }
 
-func equipItem(state *CharacterState, code string, slot string) error {
+func (state *CharacterState) equipItem(code string, slot string) error {
 	type EquipItemRequest struct {
 		Code string `json:"code"`
 		Slot string `json:"slot"`
@@ -318,7 +318,7 @@ func equipItem(state *CharacterState, code string, slot string) error {
 		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
 	}
-	_, err = performActionAndWait(state, "equip", jsonData)
+	_, err = state.performActionAndWait("equip", jsonData)
 	if err != nil {
 		state.Logger.Error("Error equiping item: %v\n", err)
 		return err
@@ -326,7 +326,7 @@ func equipItem(state *CharacterState, code string, slot string) error {
 	return nil
 }
 
-func useItem(state *CharacterState, code string, quantity int) error {
+func (state *CharacterState) useItem(code string, quantity int) error {
 	type UseItemRequest struct {
 		Code     string `json:"code"`
 		Quantity int    `json:"quantity"`
@@ -336,7 +336,7 @@ func useItem(state *CharacterState, code string, quantity int) error {
 		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
 	}
-	_, err = performActionAndWait(state, "use", jsonData)
+	_, err = state.performActionAndWait("use", jsonData)
 	if err != nil {
 		state.Logger.Error("Error using item", err)
 		return err
@@ -344,7 +344,7 @@ func useItem(state *CharacterState, code string, quantity int) error {
 	return nil
 }
 
-func depositItemAtBank(state *CharacterState, code string, qty int) error {
+func (state *CharacterState) depositItemAtBank(code string, qty int) error {
 	type DepositItemRequest struct {
 		Code     string `json:"code"`
 		Quantity int    `json:"quantity"`
@@ -354,14 +354,14 @@ func depositItemAtBank(state *CharacterState, code string, qty int) error {
 		state.Logger.Error("Error marshalling request body", err)
 		os.Exit(1)
 	}
-	_, err = performActionAndWait(state, "bank/deposit", jsonData)
+	_, err = state.performActionAndWait("bank/deposit", jsonData)
 	if err != nil {
 		state.Logger.Error("Error depositing item", "reason", err)
 		return err
 	}
 	return nil
 }
-func withdrawItemAtBank(state *CharacterState, code string, qty int) error {
+func (state *CharacterState) withdrawItemAtBank(code string, qty int) error {
 	type WithdrawItemRequest struct {
 		Code     string `json:"code"`
 		Quantity int    `json:"quantity"`
@@ -371,7 +371,7 @@ func withdrawItemAtBank(state *CharacterState, code string, qty int) error {
 		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
 	}
-	_, err = performActionAndWait(state, "bank/withdraw", jsonData)
+	_, err = state.performActionAndWait("bank/withdraw", jsonData)
 	if err != nil {
 		state.Logger.Warn("Error withdrawing item: %v\n", err)
 		return err
@@ -379,15 +379,15 @@ func withdrawItemAtBank(state *CharacterState, code string, qty int) error {
 	return nil
 }
 
-func dumpAtBank(state *CharacterState) error {
-	err := moveToBank(state)
+func (state *CharacterState) dumpAtBank() error {
+	err := state.moveToBank()
 	if err != nil {
 		return err
 	}
 
 	for _, item := range state.Inventory {
 		if item.Quantity > 0 {
-			err := depositItemAtBank(state, item.Code, item.Quantity)
+			err := state.depositItemAtBank(item.Code, item.Quantity)
 			if err != nil {
 				return err
 			}
@@ -396,7 +396,7 @@ func dumpAtBank(state *CharacterState) error {
 	return nil
 }
 
-func getInventoryFull(state *CharacterState) bool {
+func (state *CharacterState) getInventoryFull() bool {
 	inv := state.Inventory
 	count := 0
 	for _, item := range inv {
@@ -414,7 +414,7 @@ func setApiToken() {
 	}
 	API_TOKEN = string(api_tok)
 }
-func setupLogging(state *CharacterState) error {
+func (state *CharacterState) setupLogging() error {
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})
@@ -438,7 +438,7 @@ func main() {
 
 	for i, state := range states {
 		stateRefs[state.Name] = &states[i]
-		err = setupLogging(&states[i])
+		err = states[i].setupLogging()
 		if err != nil {
 			println("Failed to setup logging: %v\n", err)
 			os.Exit(1)
@@ -447,21 +447,21 @@ func main() {
 	}
 	go func() {
 		chadState := stateRefs["chad"]
-		err := chadLoop(chadState)
+		err := chadState.chadLoop()
 		if err != nil {
 			chadState.Logger.Error("Failed to chad loop: %v\n", err)
 		}
 	}()
 	go func() {
 		squidwardState := stateRefs["squidward"]
-		err := squidwardLoop(squidwardState)
+		err := squidwardState.squidwardLoop()
 		if err != nil {
 			squidwardState.Logger.Error("Failed to squward loop: %v\n", err)
 		}
 	}()
 	go func() {
 		lilyState := stateRefs["lily"]
-		err := lilyLoop(lilyState)
+		err := lilyState.lilyLoop()
 		if err != nil {
 			lilyState.Logger.Error("Failed to lily loop: %v\n", err)
 		}
@@ -469,7 +469,7 @@ func main() {
 
 	go func() {
 		timothyState := stateRefs["timothy"]
-		err := timothyLoop(timothyState)
+		err := timothyState.timothyLoop()
 		if err != nil {
 			timothyState.Logger.Error("Failed to timothy loop: %v\n", err)
 		}
@@ -477,7 +477,7 @@ func main() {
 
 	go func() {
 		mikeState := stateRefs["mike"]
-		err := mikeLoop(mikeState)
+		err := mikeState.mikeLoop()
 		if err != nil {
 			mikeState.Logger.Error("Failed to mike loop: %v\n", err)
 		}
