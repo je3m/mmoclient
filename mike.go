@@ -1,22 +1,25 @@
 package main
 
 func (state *CharacterState) mikeLoop() error {
+
 	for {
 		state.dumpAtBank()
 
-		err := withdrawItemAtBank(currentCharacter, "ash_wood", 100)
+		err := state.moveToCopperMine()
 		if err != nil {
 			return err
 		}
 
-		err = moveWoodCraftStation(currentCharacter)
-		if err != nil {
-			currentCharacter.Logger.Error("Failed to move to woodcraft", "error", err)
-			return err
-		}
-		err = craftUntil(currentCharacter, "ash_plank", 100/8)
+		err = state.gatherUntil("copper_ore", 100)
 		if err != nil {
 			return err
 		}
+
+		err = state.moveToMiningStation()
+		if err != nil {
+			return err
+		}
+
+		err = state.craftUntil("copper", 100/8)
 	}
 }

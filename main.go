@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"sync"
+
 	"time"
 )
 
@@ -249,7 +250,6 @@ func getGameStatus() ([]CharacterState, error) {
 	return response.Data, nil
 }
 
-func (state *CharacterState) fight() {
 // query game for initial status of all characters
 func getMonsterDB() (*MonsterResponse, error) {
 	response := new(MonsterResponse)
@@ -296,17 +296,17 @@ func getMonsterDB() (*MonsterResponse, error) {
 	return response, nil
 }
 
-func fight(state *CharacterState) {
+func (state *CharacterState) fight() {
 	state.Logger.Debug("fighting", "start_hp", state.Hp)
 	state.performActionAndWait("fight", []byte{})
 	state.Logger.Debug("fighting", "end_hp", state.Hp)
 }
 
-func rest(state *CharacterState) {
+func (state *CharacterState) rest() {
 	state.performActionAndWait("rest", []byte{})
 }
 
-func gathering(state *CharacterState) {
+func (state *CharacterState) gathering() {
 	state.performActionAndWait("gathering", []byte{})
 }
 
@@ -362,7 +362,7 @@ func (state *CharacterState) craftUntil(item string, quantity int) error {
 		"item", item)
 
 	for numberRemaining > 0 {
-		err := craftItem(state, item, quantity)
+		err := state.craftItem(item, quantity)
 
 		if err != nil {
 			state.Logger.Error("Error crafting item: %v\n", err)
@@ -381,7 +381,7 @@ func (state *CharacterState) craftUntil(item string, quantity int) error {
 	return nil
 }
 
-func findWorthyEnemy(state *CharacterState) string {
+func (state *CharacterState) findWorthyEnemy() string {
 	maxLevel := state.Level - 1
 	mostWorthy := ""
 	highestLevel := 0
@@ -398,9 +398,9 @@ func findWorthyEnemy(state *CharacterState) string {
 	return mostWorthy
 }
 
-func fightWorthyEnemy(state *CharacterState, healing_item string, heal_amount int) error {
+func (state *CharacterState) fightWorthyEnemy(healing_item string, heal_amount int) error {
 	//enemy := findWorthyEnemy(state)
-	location, err := getMonsterLocation(state, "yellow_slime")
+	location, err := getMonsterLocation(state, "blue_slime")
 	if err != nil {
 		return err
 	}
@@ -412,11 +412,11 @@ func fightWorthyEnemy(state *CharacterState, healing_item string, heal_amount in
 	}
 
 	state.Logger.Debug("moving", "location", location)
-	_, err = performActionAndWait(state, "move", jsonData)
+	_, err = state.performActionAndWait("move", jsonData)
 	if err != nil {
 		return err
 	}
-	err = fightUntilLowInventory(state, healing_item, heal_amount)
+	err = state.fightUntilLowInventory(healing_item, heal_amount)
 	if err != nil {
 		return err
 	}
@@ -430,10 +430,10 @@ func (state *CharacterState) healEfficient(healing_item string, amount_heal int)
 	numNeeded := hpToHeal / amount_heal
 
 	numToConsume := min(numNeeded, numHave)
-	if hpToHeal > 0 { //TODO: hack
+	if hpToHeal > 100 { //TODO: hack
 		state.Logger.Info("healing", "start_hp", state.Hp)
 
-		err := useItem(state, healing_item, numToConsume+1) //TODO: +1 is bad hack to keep killing yellow slimes overnight
+		err := state.useItem(healing_item, numToConsume+1) //TODO: +1 is bad hack to keep killing yellow slimes overnight
 		if err != nil {
 			return err
 		}
@@ -488,7 +488,7 @@ func (state *CharacterState) unequip(slot string) {
 	state.performActionAndWait("unequip", jsonData)
 }
 
-func (state *CharacterState) craftItem(code string) error {
+func (state *CharacterState) craftItem(code string, qty int) error {
 	type CraftItemRequest struct {
 		Code     string `json:"code"`
 		Quantity int    `json:"quantity"`

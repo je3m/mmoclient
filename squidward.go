@@ -13,5 +13,16 @@ func (state *CharacterState) squidwardLoop() error {
 		if err != nil {
 			return err
 		}
+
+		err = state.moveToMiningStation()
+		if err != nil {
+			return err
+		}
+
+		err = state.craftUntil("iron", 100/8)
+		if err != nil {
+			return err
+		}
+
 	}
 }
