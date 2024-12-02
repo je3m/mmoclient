@@ -6,8 +6,10 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
+
 	"time"
 )
 
@@ -35,7 +37,114 @@ type ActionResponse struct {
 	} `json:"data"`
 }
 
+type MonsterResponse struct {
+	Data []struct {
+		Name        string `json:"name"`
+		Code        string `json:"code"`
+		Level       int    `json:"level"`
+		Hp          int    `json:"hp"`
+		AttackFire  int    `json:"attack_fire"`
+		AttackEarth int    `json:"attack_earth"`
+		AttackWater int    `json:"attack_water"`
+		AttackAir   int    `json:"attack_air"`
+		ResFire     int    `json:"res_fire"`
+		ResEarth    int    `json:"res_earth"`
+		ResWater    int    `json:"res_water"`
+		ResAir      int    `json:"res_air"`
+		MinGold     int    `json:"min_gold"`
+		MaxGold     int    `json:"max_gold"`
+		Drops       []struct {
+			Code        string `json:"code"`
+			Rate        int    `json:"rate"`
+			MinQuantity int    `json:"min_quantity"`
+			MaxQuantity int    `json:"max_quantity"`
+		} `json:"drops"`
+	} `json:"data"`
+	Total int `json:"total"`
+	Page  int `json:"page"`
+	Size  int `json:"size"`
+	Pages int `json:"pages"`
+}
+
+var MonsterDB *MonsterResponse
+
 var API_TOKEN = ""
+
+type MapResponse struct {
+	Data []struct {
+		Name    string `json:"name"`
+		Skin    string `json:"skin"`
+		X       int    `json:"x"`
+		Y       int    `json:"y"`
+		Content struct {
+			Type string `json:"type"`
+			Code string `json:"code"`
+		} `json:"content"`
+	} `json:"data"`
+	Total int `json:"total"`
+	Page  int `json:"page"`
+	Size  int `json:"size"`
+	Pages int `json:"pages"`
+}
+
+func getMonsterLocation(state *CharacterState, monsterName string) (*MoveRequest, error) {
+	response := new(MapResponse)
+	retval := new(MoveRequest)
+
+	// Define the endpoint and token
+	apiURL := "https://api.artifactsmmo.com/maps"
+
+	u, _ := url.Parse(apiURL)
+
+	q := u.Query()
+	q.Add("content_code", monsterName)
+	q.Add("content_type", "monster")
+
+	u.RawQuery = q.Encode()
+
+	// Create the HTTP request
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set headers
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read and display the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, ResponseCodeError{ArtifactsResponseCode(resp.StatusCode)}
+	}
+
+	err = json.Unmarshal(body, &response)
+
+	if err != nil {
+		slog.Error("Error parsing response: %v\n", err)
+		return nil, err
+	}
+
+	for _, spot := range response.Data {
+		// TODO: go to closest
+		retval.X = spot.X
+		retval.Y = spot.Y
+	}
+	return retval, nil
+}
 
 // perform given action and block until cooldown is up
 func (state *CharacterState) performActionAndWait(actionName string, actionData []byte) (*ActionResponse, error) {
@@ -141,17 +250,63 @@ func getGameStatus() ([]CharacterState, error) {
 	return response.Data, nil
 }
 
+// query game for initial status of all characters
+func getMonsterDB() (*MonsterResponse, error) {
+	response := new(MonsterResponse)
+
+	// Define the endpoint and token
+	apiURL := "https://api.artifactsmmo.com/monsters"
+
+	// Create the HTTP request
+	req, err := http.NewRequest("GET", apiURL, bytes.NewBuffer([]byte{}))
+	if err != nil {
+		return nil, err
+	}
+
+	// Set headers
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
+
+	// Send the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read and display the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, ResponseCodeError{ArtifactsResponseCode(resp.StatusCode)}
+	}
+
+	err = json.Unmarshal(body, &response)
+
+	if err != nil {
+		slog.Error("Error parsing response: %v\n", err)
+		return nil, err
+	}
+
+	return response, nil
+}
+
 func (state *CharacterState) fight() {
 	state.Logger.Debug("fighting", "start_hp", state.Hp)
 	state.performActionAndWait("fight", []byte{})
 	state.Logger.Debug("fighting", "end_hp", state.Hp)
 }
 
-func rest(state *CharacterState) {
+func (state *CharacterState) rest() {
 	state.performActionAndWait("rest", []byte{})
 }
 
-func gathering(state *CharacterState) {
+func (state *CharacterState) gathering() {
 	state.performActionAndWait("gathering", []byte{})
 }
 
@@ -207,7 +362,7 @@ func (state *CharacterState) craftUntil(item string, quantity int) error {
 		"item", item)
 
 	for numberRemaining > 0 {
-		err := state.craftItem(item)
+		err := state.craftItem(item, quantity)
 
 		if err != nil {
 			state.Logger.Error("Error crafting item: %v\n", err)
@@ -226,6 +381,48 @@ func (state *CharacterState) craftUntil(item string, quantity int) error {
 	return nil
 }
 
+func (state *CharacterState) findWorthyEnemy() string {
+	maxLevel := state.Level - 1
+	mostWorthy := ""
+	highestLevel := 0
+
+	for _, monster := range MonsterDB.Data {
+		if monster.Level < maxLevel && monster.Level > highestLevel {
+			mostWorthy = monster.Code
+			highestLevel = monster.Level
+		}
+	}
+
+	state.Logger.Debug(mostWorthy + " deemed worthy")
+
+	return mostWorthy
+}
+
+func (state *CharacterState) fightWorthyEnemy(healing_item string, heal_amount int) error {
+	//enemy := findWorthyEnemy(state)
+	location, err := getMonsterLocation(state, "blue_slime")
+	if err != nil {
+		return err
+	}
+
+	jsonData, err := json.Marshal(location)
+	if err != nil {
+		state.Logger.Error("Error marshalling request body: %v\n", err)
+		os.Exit(1)
+	}
+
+	state.Logger.Debug("moving", "location", location)
+	_, err = state.performActionAndWait("move", jsonData)
+	if err != nil {
+		return err
+	}
+	err = state.fightUntilLowInventory(healing_item, heal_amount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // heal as much as possible without waste
 func (state *CharacterState) healEfficient(healing_item string, amount_heal int) error {
 	numHave := state.getItemInventoryQty(healing_item)
@@ -233,10 +430,10 @@ func (state *CharacterState) healEfficient(healing_item string, amount_heal int)
 	numNeeded := hpToHeal / amount_heal
 
 	numToConsume := min(numNeeded, numHave)
-	if numToConsume > 0 {
+	if hpToHeal > 100 { //TODO: hack
 		state.Logger.Info("healing", "start_hp", state.Hp)
 
-		err := state.useItem(healing_item, numToConsume)
+		err := state.useItem(healing_item, numToConsume+1) //TODO: +1 is bad hack to keep killing yellow slimes overnight
 		if err != nil {
 			return err
 		}
@@ -291,11 +488,12 @@ func (state *CharacterState) unequip(slot string) {
 	state.performActionAndWait("unequip", jsonData)
 }
 
-func (state *CharacterState) craftItem(code string) error {
+func (state *CharacterState) craftItem(code string, qty int) error {
 	type CraftItemRequest struct {
-		Code string `json:"code"`
+		Code     string `json:"code"`
+		Quantity int    `json:"quantity"`
 	}
-	jsonData, err := json.Marshal(CraftItemRequest{code})
+	jsonData, err := json.Marshal(CraftItemRequest{code, qty})
 	if err != nil {
 		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
@@ -432,9 +630,16 @@ func main() {
 
 	states, err := getGameStatus()
 	if err != nil {
-		slog.Error("Failed to get game status: %v\n", err)
+		slog.Error("Failed to get game status", "error", err)
 		os.Exit(1)
 	}
+
+	db, err := getMonsterDB()
+	if err != nil {
+		slog.Error("Failed to get Monster DB", "error", err)
+		os.Exit(1)
+	}
+	MonsterDB = db
 
 	for i, state := range states {
 		stateRefs[state.Name] = &states[i]

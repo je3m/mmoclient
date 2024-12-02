@@ -4,12 +4,12 @@ func (state *CharacterState) timothyLoop() error {
 	for {
 		state.dumpAtBank()
 
-		err := state.moveToShrimp()
+		err := state.moveToTrout()
 		if err != nil {
-			state.Logger.Warn("Failed to move to shrimp: %v\n", err)
 			return err
 		}
-		err = state.gatherUntil("shrimp", 100)
+
+		err = state.gatherUntil("trout", 100)
 		if err != nil {
 			return err
 		}

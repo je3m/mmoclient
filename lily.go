@@ -5,16 +5,12 @@ func (state *CharacterState) lilyLoop() error {
 	for {
 		state.dumpAtBank()
 
-		err := state.withdrawItemAtBank("cooked_gudgeon", 30)
+		err := state.withdrawItemAtBank("cooked_shrimp", 30)
 		if err != nil {
 			return err
 		}
+		err = state.fightWorthyEnemy("cooked_shrimp", 150)
 
-		err = state.moveToChicken()
-		if err != nil {
-			return err
-		}
-		err = state.fightUntilLowInventory("cooked_gudgeon", 75)
 		if err != nil {
 			return err
 		}

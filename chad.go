@@ -12,5 +12,15 @@ func (state *CharacterState) chadLoop() error {
 		if err != nil {
 			return err
 		}
+
+		err = state.moveToWoodcraftStation()
+		if err != nil {
+			return err
+		}
+
+		err = state.craftUntil("spruce_plank", 100/8)
+		if err != nil {
+			return err
+		}
 	}
 }

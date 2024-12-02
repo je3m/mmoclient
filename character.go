@@ -101,4 +101,10 @@ func (state *CharacterState) updateInventory(resp *ActionResponse) {
 	state.InventoryMaxItems = resp.Data.Character.InventoryMaxItems
 	state.Hp = resp.Data.Character.Hp
 	state.MaxHp = resp.Data.Character.MaxHp
+
+	newLevel := resp.Data.Character.Level
+	if state.Level < newLevel {
+		state.Logger.Info("Level up!", "new level", newLevel)
+	}
+	state.Level = newLevel
 }

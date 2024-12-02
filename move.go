@@ -24,6 +24,10 @@ var locations = map[string]MoveRequest{
 	"WeaponCraftingStation": {2, 1},
 	"Alchemy":               {2, 3},
 	"Chicken":               {0, 1},
+	"WoodCraftingStation":   {-2, -3},
+	"MiningStation":         {1, 5},
+	"Trout":                 {7, 12},
+	"GearCraftingStation":   {3, 1},
 }
 
 func (state *CharacterState) move(location string) error {
@@ -34,7 +38,6 @@ func (state *CharacterState) move(location string) error {
 		state.Logger.Error("Error marshalling request body:", "error", err)
 		os.Exit(1)
 	}
-
 	_, err = state.performActionAndWait("move", requestBody)
 
 	if err != nil {
@@ -54,6 +57,11 @@ func (state *CharacterState) move(location string) error {
 func (state *CharacterState) moveWeaponCraftStation() error {
 	return state.move("WeaponCraftingStation")
 }
+
+func (state *CharacterState) moveToWoodcraftStation() error {
+	return state.move("WoodCraftingStation")
+}
+
 func (state *CharacterState) moveToAshTreeForest() error {
 	return state.move("AshTreeForest")
 }
@@ -82,8 +90,19 @@ func (state *CharacterState) moveToShrimp() error {
 	return state.move("Shrimp")
 }
 
+func (state *CharacterState) moveToGearCrafting() error {
+	return state.move("GearCraftingStation")
+}
+
+func (state *CharacterState) moveToMiningStation() error {
+	return state.move("MiningStation")
+}
 func (state *CharacterState) moveToGudgeon() error {
 	return state.move("Gudgeon")
+}
+
+func (state *CharacterState) moveToTrout() error {
+	return state.move("Trout")
 }
 
 func (state *CharacterState) moveToCooking() error {
