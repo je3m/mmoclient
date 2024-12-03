@@ -7,6 +7,7 @@ import (
 
 type CharacterState struct {
 	Logger               *slog.Logger
+	GameLoop             func() error
 	Name                 string    `json:"name"`
 	Account              string    `json:"account"`
 	Skin                 string    `json:"skin"`

@@ -3,13 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
-	"sync"
-
 	"time"
 )
 
@@ -693,73 +692,88 @@ func (state *CharacterState) setupLogging() error {
 	return nil
 }
 
-func main() {
-	stateRefs := make(map[string]*CharacterState)
+func setupMonsterDB() error {
+	db, err := getMonsterDB()
+	if err != nil {
+		return err
+	}
+	MonsterDB = db
+	return nil
+}
 
-	setApiToken()
+func doGameLoop(state *CharacterState) error {
+	switch state.Name {
+	case "lily":
+		return state.lilyLoop()
+	case "timothy":
+		return state.timothyLoop()
+	case "chad":
+		return state.chadLoop()
+	case "squidward":
+		return state.squidwardLoop()
+	case "mike":
+		return state.mikeLoop()
+	default:
+		return errors.New("unknown character: " + state.Name)
+	}
+}
 
+func setupStates(stateRefs map[string]*CharacterState) error {
 	states, err := getGameStatus()
 	if err != nil {
 		slog.Error("Failed to get game status", "error", err)
 		os.Exit(1)
 	}
 
-	db, err := getMonsterDB()
-	if err != nil {
-		slog.Error("Failed to get Monster DB", "error", err)
-		os.Exit(1)
-	}
-	MonsterDB = db
-
 	for i, state := range states {
 		stateRefs[state.Name] = &states[i]
+
 		err = states[i].setupLogging()
 		if err != nil {
 			println("Failed to setup logging: %v\n", err)
 			os.Exit(1)
 		}
-
 	}
-	go func() {
-		chadState := stateRefs["chad"]
-		err := chadState.chadLoop()
-		if err != nil {
-			chadState.Logger.Error("Failed to chad loop: %v\n", err)
-		}
-	}()
-	go func() {
-		squidwardState := stateRefs["squidward"]
-		err := squidwardState.squidwardLoop()
-		if err != nil {
-			squidwardState.Logger.Error("Failed to squward loop: %v\n", err)
-		}
-	}()
-	go func() {
-		lilyState := stateRefs["lily"]
-		err := lilyState.lilyLoop()
-		if err != nil {
-			lilyState.Logger.Error("Failed to lily loop: %v\n", err)
-		}
-	}()
+	return err
+}
 
-	go func() {
-		timothyState := stateRefs["timothy"]
-		err := timothyState.timothyLoop()
+func main() {
+	stateRefs := make(map[string]*CharacterState)
+	characterName := os.Args[1]
+
+	setApiToken()
+
+	err := setupStates(stateRefs)
+	if err != nil {
+		slog.Error("Failed to setup states", "error", err)
+		os.Exit(1)
+	}
+
+	state := stateRefs[characterName]
+	if state == nil {
+		slog.Error("Character not found", "characterName", characterName)
+		os.Exit(1)
+	}
+
+	err = setupMonsterDB()
+	if err != nil {
+		slog.Error("Failed to get Monster DB", "error", err)
+		os.Exit(1)
+	}
+
+	failed := false
+	for {
+		err := doGameLoop(state)
 		if err != nil {
-			timothyState.Logger.Error("Failed to timothy loop: %v\n", err)
+			if failed {
+				state.Logger.Error("Error in gameloop. killing program")
+				os.Exit(1)
+			} else {
+				state.Logger.Error("Error in gameloop. rebooting character...")
+				failed = true
+			}
+		} else {
+			failed = false
 		}
-	}()
-
-	go func() {
-		mikeState := stateRefs["mike"]
-		err := mikeState.mikeLoop()
-		if err != nil {
-			mikeState.Logger.Error("Failed to mike loop: %v\n", err)
-		}
-	}()
-
-	var wg = sync.WaitGroup{}
-	wg.Add(1)
-	defer wg.Wait()
-
+	}
 }
