@@ -93,18 +93,23 @@ func (state *CharacterState) String() string {
 }
 
 // I think go makes you do all this shit manually :c
-func (state *CharacterState) updateInventory(resp *ActionResponse) {
-	state.Inventory = nil
-	for _, slot := range resp.Data.Character.Inventory {
-		state.Inventory = append(state.Inventory, slot)
-	}
-	state.InventoryMaxItems = resp.Data.Character.InventoryMaxItems
-	state.Hp = resp.Data.Character.Hp
-	state.MaxHp = resp.Data.Character.MaxHp
-
+func (state *CharacterState) updateState(resp *ActionResponse) {
+	//state.Inventory = nil
+	//for _, slot := range resp.Data.Character.Inventory {
+	//	state.Inventory = append(state.Inventory, slot)
+	//}
+	//state.InventoryMaxItems = resp.Data.Character.InventoryMaxItems
+	//state.Hp = resp.Data.Character.Hp
+	//state.MaxHp = resp.Data.Character.MaxHp
+	//
 	newLevel := resp.Data.Character.Level
 	if state.Level < newLevel {
 		state.Logger.Info("Level up!", "new level", newLevel)
 	}
-	state.Level = newLevel
+
+	logger := state.Logger
+	*state = resp.Data.Character
+	state.Logger = logger
+
+	//state.Level = newLevel
 }

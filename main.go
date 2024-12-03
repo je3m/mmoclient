@@ -195,7 +195,7 @@ func (state *CharacterState) performActionAndWait(actionName string, actionData 
 		return nil, err
 	}
 
-	state.updateInventory(response)
+	state.updateState(response)
 
 	cooldown := response.Data.Cooldown.RemainingSeconds
 	state.Logger.Debug("Waiting finish action", "cooldown", cooldown, "action", actionName)
@@ -296,10 +296,12 @@ func getMonsterDB() (*MonsterResponse, error) {
 	return response, nil
 }
 
-func (state *CharacterState) fight() {
-	state.Logger.Debug("fighting", "start_hp", state.Hp)
-	state.performActionAndWait("fight", []byte{})
-	state.Logger.Debug("fighting", "end_hp", state.Hp)
+func (state *CharacterState) fight() error {
+	_, err := state.performActionAndWait("fight", []byte{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (state *CharacterState) rest() {
@@ -353,6 +355,26 @@ func (state *CharacterState) gatherUntil(item string, quantity int) error {
 	return nil
 }
 
+func (state *CharacterState) grindCrafting(itemToCraft string, ingredientName string, numIngredientPerCraft int) error {
+	ingredientQty := state.getItemInventoryQty(ingredientName)
+
+	for ingredientQty > numIngredientPerCraft {
+		itemsToCraft := ingredientQty / numIngredientPerCraft
+
+		err := state.craftItem(itemToCraft, itemsToCraft)
+		if err != nil {
+			return err
+		}
+
+		err = state.recycleItem(itemToCraft, itemsToCraft)
+		if err != nil {
+			return err
+		}
+		ingredientQty = state.getItemInventoryQty(ingredientName)
+	}
+	return nil
+}
+
 // Perform cooking action until inventory contains at least <quantity> of item
 func (state *CharacterState) craftUntil(item string, quantity int) error {
 	numberRemaining := 1
@@ -398,9 +420,9 @@ func (state *CharacterState) findWorthyEnemy() string {
 	return mostWorthy
 }
 
-func (state *CharacterState) fightWorthyEnemy(healing_item string, heal_amount int) error {
+func (state *CharacterState) goFightEnemy(enemyName string, healing_item string, heal_amount int) error {
 	//enemy := findWorthyEnemy(state)
-	location, err := getMonsterLocation(state, "blue_slime")
+	location, err := getMonsterLocation(state, enemyName)
 	if err != nil {
 		return err
 	}
@@ -430,16 +452,44 @@ func (state *CharacterState) healEfficient(healing_item string, amount_heal int)
 	numNeeded := hpToHeal / amount_heal
 
 	numToConsume := min(numNeeded, numHave)
-	if hpToHeal > 100 { //TODO: hack
+	if hpToHeal > amount_heal*9/10 {
 		state.Logger.Info("healing", "start_hp", state.Hp)
 
-		err := state.useItem(healing_item, numToConsume+1) //TODO: +1 is bad hack to keep killing yellow slimes overnight
+		err := state.useItem(healing_item, max(1, numToConsume)) //TODO: this is bad hack to keep killing yellow slimes overnight
 		if err != nil {
 			return err
 		}
 		state.Logger.Info("healing", "end_hp", state.Hp)
 	}
 
+	return nil
+}
+
+func (state *CharacterState) goFightEnemyRest(enemyName string, healing_item string, heal_amount int) error {
+	//enemy := findWorthyEnemy(state)
+	location, err := getMonsterLocation(state, enemyName)
+	if err != nil {
+		return err
+	}
+
+	jsonData, err := json.Marshal(location)
+	if err != nil {
+		state.Logger.Error("Error marshalling request body: %v\n", err)
+		os.Exit(1)
+	}
+
+	state.Logger.Debug("moving", "location", location)
+	_, err = state.performActionAndWait("move", jsonData)
+	if err != nil {
+		return err
+	}
+	for {
+		err = state.fight()
+		if err != nil {
+			return err
+		}
+		state.rest()
+	}
 	return nil
 }
 
@@ -462,7 +512,11 @@ func (state *CharacterState) fightUntilLowInventory(healing_item string, amount_
 			return nil
 		}
 
-		state.fight()
+		err = state.fight()
+		if err != nil {
+			return err
+		}
+
 		fight_count++
 		numHealItem = state.getItemInventoryQty(healing_item)
 
@@ -486,6 +540,22 @@ func (state *CharacterState) unequip(slot string) {
 	}
 
 	state.performActionAndWait("unequip", jsonData)
+}
+func (state *CharacterState) recycleItem(code string, qty int) error {
+	type RecycleItemRequest struct {
+		Code     string `json:"code"`
+		Quantity int    `json:"quantity"`
+	}
+	jsonData, err := json.Marshal(RecycleItemRequest{code, qty})
+	if err != nil {
+		return err
+	}
+
+	_, err = state.performActionAndWait("recycling", jsonData)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (state *CharacterState) craftItem(code string, qty int) error {

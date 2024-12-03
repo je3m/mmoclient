@@ -4,14 +4,14 @@ func (state *CharacterState) timothyLoop() error {
 	for {
 		state.dumpAtBank()
 
-		err := state.moveToTrout()
-		if err != nil {
-			return err
-		}
+		//err := state.withdrawItemAtBank("apple", 30)
+		//if err != nil {
+		//	return err
+		//}
+		err := state.goFightEnemyRest("chicken", "apple", 50)
 
-		err = state.gatherUntil("trout", 100)
 		if err != nil {
-			return err
+			state.Logger.Error("something went wrong: restarting")
 		}
 	}
 }
