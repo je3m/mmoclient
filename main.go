@@ -422,7 +422,6 @@ func (state *CharacterState) findWorthyEnemy() string {
 }
 
 func (state *CharacterState) goFightEnemy(enemyName string, healing_item string, heal_amount int) error {
-	//enemy := findWorthyEnemy(state)
 	location, err := getMonsterLocation(state, enemyName)
 	if err != nil {
 		return err
@@ -467,7 +466,6 @@ func (state *CharacterState) healEfficient(healing_item string, amount_heal int)
 }
 
 func (state *CharacterState) goFightEnemyRest(enemyName string, healing_item string, heal_amount int) error {
-	//enemy := findWorthyEnemy(state)
 	location, err := getMonsterLocation(state, enemyName)
 	if err != nil {
 		return err
