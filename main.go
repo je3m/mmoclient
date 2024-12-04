@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -737,13 +739,40 @@ func setupStates(stateRefs map[string]*CharacterState) error {
 	return err
 }
 
+func makePidfile(characterName string) (string, error) {
+	pid := os.Getpid()
+	pidFile := characterName + ".pid"
+
+	file, err := os.Create(pidFile)
+	if err != nil {
+		return "", err
+	}
+
+	defer file.Close()
+
+	// Write the PID to the file
+	_, err = file.WriteString(strconv.Itoa(pid))
+	if err != nil {
+		return "", err
+	}
+	return pidFile, nil
+}
+
 func main() {
 	stateRefs := make(map[string]*CharacterState)
 	characterName := os.Args[1]
 
+	pidFile, err := makePidfile(characterName)
+	if err != nil {
+		fmt.Println("Error creating PID file:", err)
+		os.Exit(1)
+	}
+
+	defer os.Remove(pidFile)
+
 	setApiToken()
 
-	err := setupStates(stateRefs)
+	err = setupStates(stateRefs)
 	if err != nil {
 		slog.Error("Failed to setup states", "error", err)
 		os.Exit(1)
