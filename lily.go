@@ -1,7 +1,6 @@
 package main
 
 func (state *CharacterState) lilyLoop() error {
-
 	for {
 		state.dumpAtBank()
 
@@ -9,7 +8,7 @@ func (state *CharacterState) lilyLoop() error {
 		if err != nil {
 			return err
 		}
-		err = state.fightWorthyEnemy("cooked_shrimp", 150)
+		err = state.goFightEnemy("blue_slime", "cooked_shrimp", 150)
 
 		if err != nil {
 			return err

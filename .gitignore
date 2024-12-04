@@ -5,3 +5,4 @@ token.txt
 .jj/
 *~
 *.log
+*.pid

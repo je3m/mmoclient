@@ -1,6 +1,6 @@
 package main
 
-func (state *CharacterState) chadLoop() error {
+func (state *CharacterState) farmSpruce() error {
 	for {
 		state.dumpAtBank()
 
@@ -19,6 +19,19 @@ func (state *CharacterState) chadLoop() error {
 		}
 
 		err = state.craftUntil("spruce_plank", 100/8)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (state *CharacterState) chadLoop() error {
+	for {
+		state.dumpAtBank()
+
+		err := state.goFightEnemyRest("chicken", "apple", 50)
+
 		if err != nil {
 			return err
 		}

@@ -54,7 +54,7 @@ func (state *CharacterState) move(location string) error {
 	return nil
 }
 
-func (state *CharacterState) moveWeaponCraftStation() error {
+func (state *CharacterState) moveToWeaponCraftingStation() error {
 	return state.move("WeaponCraftingStation")
 }
 

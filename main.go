@@ -3,13 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
-	"sync"
-
+	"strconv"
 	"time"
 )
 
@@ -195,7 +196,7 @@ func (state *CharacterState) performActionAndWait(actionName string, actionData 
 		return nil, err
 	}
 
-	state.updateInventory(response)
+	state.updateState(response)
 
 	cooldown := response.Data.Cooldown.RemainingSeconds
 	state.Logger.Debug("Waiting finish action", "cooldown", cooldown, "action", actionName)
@@ -296,10 +297,12 @@ func getMonsterDB() (*MonsterResponse, error) {
 	return response, nil
 }
 
-func (state *CharacterState) fight() {
-	state.Logger.Debug("fighting", "start_hp", state.Hp)
-	state.performActionAndWait("fight", []byte{})
-	state.Logger.Debug("fighting", "end_hp", state.Hp)
+func (state *CharacterState) fight() error {
+	_, err := state.performActionAndWait("fight", []byte{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (state *CharacterState) rest() {
@@ -353,6 +356,26 @@ func (state *CharacterState) gatherUntil(item string, quantity int) error {
 	return nil
 }
 
+func (state *CharacterState) grindCrafting(itemToCraft string, ingredientName string, numIngredientPerCraft int) error {
+	ingredientQty := state.getItemInventoryQty(ingredientName)
+
+	for ingredientQty > numIngredientPerCraft {
+		itemsToCraft := ingredientQty / numIngredientPerCraft
+
+		err := state.craftItem(itemToCraft, itemsToCraft)
+		if err != nil {
+			return err
+		}
+
+		err = state.recycleItem(itemToCraft, itemsToCraft)
+		if err != nil {
+			return err
+		}
+		ingredientQty = state.getItemInventoryQty(ingredientName)
+	}
+	return nil
+}
+
 // Perform cooking action until inventory contains at least <quantity> of item
 func (state *CharacterState) craftUntil(item string, quantity int) error {
 	numberRemaining := 1
@@ -398,9 +421,8 @@ func (state *CharacterState) findWorthyEnemy() string {
 	return mostWorthy
 }
 
-func (state *CharacterState) fightWorthyEnemy(healing_item string, heal_amount int) error {
-	//enemy := findWorthyEnemy(state)
-	location, err := getMonsterLocation(state, "blue_slime")
+func (state *CharacterState) goFightEnemy(enemyName string, healing_item string, heal_amount int) error {
+	location, err := getMonsterLocation(state, enemyName)
 	if err != nil {
 		return err
 	}
@@ -430,16 +452,43 @@ func (state *CharacterState) healEfficient(healing_item string, amount_heal int)
 	numNeeded := hpToHeal / amount_heal
 
 	numToConsume := min(numNeeded, numHave)
-	if hpToHeal > 100 { //TODO: hack
+	if hpToHeal > amount_heal*9/10 {
 		state.Logger.Info("healing", "start_hp", state.Hp)
 
-		err := state.useItem(healing_item, numToConsume+1) //TODO: +1 is bad hack to keep killing yellow slimes overnight
+		err := state.useItem(healing_item, max(1, numToConsume)) //TODO: this is bad hack to keep killing yellow slimes overnight
 		if err != nil {
 			return err
 		}
 		state.Logger.Info("healing", "end_hp", state.Hp)
 	}
 
+	return nil
+}
+
+func (state *CharacterState) goFightEnemyRest(enemyName string, healing_item string, heal_amount int) error {
+	location, err := getMonsterLocation(state, enemyName)
+	if err != nil {
+		return err
+	}
+
+	jsonData, err := json.Marshal(location)
+	if err != nil {
+		state.Logger.Error("Error marshalling request body: %v\n", err)
+		os.Exit(1)
+	}
+
+	state.Logger.Debug("moving", "location", location)
+	_, err = state.performActionAndWait("move", jsonData)
+	if err != nil {
+		return err
+	}
+	for {
+		err = state.fight()
+		if err != nil {
+			return err
+		}
+		state.rest()
+	}
 	return nil
 }
 
@@ -462,7 +511,11 @@ func (state *CharacterState) fightUntilLowInventory(healing_item string, amount_
 			return nil
 		}
 
-		state.fight()
+		err = state.fight()
+		if err != nil {
+			return err
+		}
+
 		fight_count++
 		numHealItem = state.getItemInventoryQty(healing_item)
 
@@ -486,6 +539,22 @@ func (state *CharacterState) unequip(slot string) {
 	}
 
 	state.performActionAndWait("unequip", jsonData)
+}
+func (state *CharacterState) recycleItem(code string, qty int) error {
+	type RecycleItemRequest struct {
+		Code     string `json:"code"`
+		Quantity int    `json:"quantity"`
+	}
+	jsonData, err := json.Marshal(RecycleItemRequest{code, qty})
+	if err != nil {
+		return err
+	}
+
+	_, err = state.performActionAndWait("recycling", jsonData)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (state *CharacterState) craftItem(code string, qty int) error {
@@ -623,73 +692,115 @@ func (state *CharacterState) setupLogging() error {
 	return nil
 }
 
-func main() {
-	stateRefs := make(map[string]*CharacterState)
+func setupMonsterDB() error {
+	db, err := getMonsterDB()
+	if err != nil {
+		return err
+	}
+	MonsterDB = db
+	return nil
+}
 
-	setApiToken()
+func doGameLoop(state *CharacterState) error {
+	switch state.Name {
+	case "lily":
+		return state.lilyLoop()
+	case "timothy":
+		return state.timothyLoop()
+	case "chad":
+		return state.chadLoop()
+	case "squidward":
+		return state.squidwardLoop()
+	case "mike":
+		return state.mikeLoop()
+	default:
+		return errors.New("unknown character: " + state.Name)
+	}
+}
 
+func setupStates(stateRefs map[string]*CharacterState) error {
 	states, err := getGameStatus()
 	if err != nil {
 		slog.Error("Failed to get game status", "error", err)
 		os.Exit(1)
 	}
 
-	db, err := getMonsterDB()
-	if err != nil {
-		slog.Error("Failed to get Monster DB", "error", err)
-		os.Exit(1)
-	}
-	MonsterDB = db
-
 	for i, state := range states {
 		stateRefs[state.Name] = &states[i]
+
 		err = states[i].setupLogging()
 		if err != nil {
 			println("Failed to setup logging: %v\n", err)
 			os.Exit(1)
 		}
-
 	}
-	go func() {
-		chadState := stateRefs["chad"]
-		err := chadState.chadLoop()
-		if err != nil {
-			chadState.Logger.Error("Failed to chad loop: %v\n", err)
-		}
-	}()
-	go func() {
-		squidwardState := stateRefs["squidward"]
-		err := squidwardState.squidwardLoop()
-		if err != nil {
-			squidwardState.Logger.Error("Failed to squward loop: %v\n", err)
-		}
-	}()
-	go func() {
-		lilyState := stateRefs["lily"]
-		err := lilyState.lilyLoop()
-		if err != nil {
-			lilyState.Logger.Error("Failed to lily loop: %v\n", err)
-		}
-	}()
+	return err
+}
 
-	go func() {
-		timothyState := stateRefs["timothy"]
-		err := timothyState.timothyLoop()
+func makePidfile(characterName string) (string, error) {
+	pid := os.Getpid()
+	pidFile := characterName + ".pid"
+
+	file, err := os.Create(pidFile)
+	if err != nil {
+		return "", err
+	}
+
+	defer file.Close()
+
+	// Write the PID to the file
+	_, err = file.WriteString(strconv.Itoa(pid))
+	if err != nil {
+		return "", err
+	}
+	return pidFile, nil
+}
+
+func main() {
+	stateRefs := make(map[string]*CharacterState)
+	characterName := os.Args[1]
+
+	pidFile, err := makePidfile(characterName)
+	if err != nil {
+		fmt.Println("Error creating PID file:", err)
+		os.Exit(1)
+	}
+
+	defer os.Remove(pidFile)
+
+	setApiToken()
+
+	err = setupStates(stateRefs)
+	if err != nil {
+		slog.Error("Failed to setup states", "error", err)
+		os.Exit(1)
+	}
+
+	state := stateRefs[characterName]
+	if state == nil {
+		slog.Error("Character not found", "characterName", characterName)
+		os.Exit(1)
+	}
+
+	err = setupMonsterDB()
+	if err != nil {
+		slog.Error("Failed to get Monster DB", "error", err)
+		os.Exit(1)
+	}
+
+	failed := false
+	for {
+		err := doGameLoop(state)
 		if err != nil {
-			timothyState.Logger.Error("Failed to timothy loop: %v\n", err)
+			if failed {
+				state.Logger.Error("Error in gameloop. killing program")
+				os.Exit(1)
+			} else {
+				state.Logger.Error("Error in gameloop. rebooting character...")
+				failed = true
+			}
+		} else {
+			failed = false
 		}
-	}()
-
-	go func() {
-		mikeState := stateRefs["mike"]
-		err := mikeState.mikeLoop()
-		if err != nil {
-			mikeState.Logger.Error("Failed to mike loop: %v\n", err)
-		}
-	}()
-
-	var wg = sync.WaitGroup{}
-	wg.Add(1)
-	defer wg.Wait()
-
+	}
 }
