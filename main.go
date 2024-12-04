@@ -185,7 +185,8 @@ func (state *CharacterState) performActionAndWait(actionName string, actionData 
 	if resp.StatusCode != http.StatusOK {
 		state.Logger.Warn("Request failed with status",
 			"action_name", actionName,
-			"response_code", ArtifactsResponseCode(resp.StatusCode))
+			"response_code", ArtifactsResponseCode(resp.StatusCode),
+			"val", resp.StatusCode)
 		return nil, ResponseCodeError{ArtifactsResponseCode(resp.StatusCode)}
 	}
 
@@ -465,7 +466,7 @@ func (state *CharacterState) healEfficient(healing_item string, amount_heal int)
 	return nil
 }
 
-func (state *CharacterState) goFightEnemyRest(enemyName string, healing_item string, heal_amount int) error {
+func (state *CharacterState) goFightEnemyRest(enemyName string) error {
 	location, err := getMonsterLocation(state, enemyName)
 	if err != nil {
 		return err
@@ -763,7 +764,7 @@ func main() {
 	pidFile, err := makePidfile(characterName)
 	if err != nil {
 		fmt.Println("Error creating PID file:", err)
-		os.Exit(1)
+		return
 	}
 
 	defer os.Remove(pidFile)
@@ -773,34 +774,37 @@ func main() {
 	err = setupStates(stateRefs)
 	if err != nil {
 		slog.Error("Failed to setup states", "error", err)
-		os.Exit(1)
+		return
 	}
 
 	state := stateRefs[characterName]
 	if state == nil {
 		slog.Error("Character not found", "characterName", characterName)
-		os.Exit(1)
+		return
 	}
 
 	err = setupMonsterDB()
 	if err != nil {
 		slog.Error("Failed to get Monster DB", "error", err)
-		os.Exit(1)
+		return
 	}
 
-	failed := false
+	lastFail := time.Now().Add(time.Duration(-1) * time.Hour)
+
 	for {
 		err := doGameLoop(state)
 		if err != nil {
-			if failed {
+			currentTime := time.Now()
+			timeSinceLastFail := currentTime.Sub(lastFail)
+
+			if timeSinceLastFail < time.Duration(5)*time.Minute {
 				state.Logger.Error("Error in gameloop. killing program")
-				os.Exit(1)
+				return
 			} else {
 				state.Logger.Error("Error in gameloop. rebooting character...")
-				failed = true
+
 			}
-		} else {
-			failed = false
+			lastFail = time.Now()
 		}
 	}
 }

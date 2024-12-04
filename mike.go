@@ -3,9 +3,12 @@ package main
 func (state *CharacterState) mikeLoop() error {
 
 	for {
-		state.dumpAtBank()
+		err := state.dumpAtBank()
+		if err != nil {
+			return err
+		}
 
-		err := state.moveToCopperMine()
+		err = state.moveToCopperMine()
 		if err != nil {
 			return err
 		}

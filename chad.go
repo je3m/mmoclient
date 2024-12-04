@@ -30,7 +30,7 @@ func (state *CharacterState) chadLoop() error {
 	for {
 		state.dumpAtBank()
 
-		err := state.goFightEnemyRest("chicken", "apple", 50)
+		err := state.goFightEnemyRest("yellow_slime")
 
 		if err != nil {
 			return err
