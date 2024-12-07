@@ -7,22 +7,24 @@ import (
 )
 
 var locations = map[string]MoveRequest{
-	"AshTreeForest":         {-1, 0},
-	"CopperMine":            {2, 0},
-	"IronMine":              {1, 7},
-	"Bank":                  {4, 1},
-	"Spruce":                {2, 6},
-	"Sunflower":             {2, 2},
-	"Shrimp":                {5, 2},
-	"Gudgeon":               {5, 2},
-	"Cooking":               {1, 1},
-	"WeaponCraftingStation": {2, 1},
-	"Alchemy":               {2, 3},
-	"Chicken":               {0, 1},
-	"WoodCraftingStation":   {-2, -3},
-	"MiningStation":         {1, 5},
-	"Trout":                 {7, 12},
-	"GearCraftingStation":   {3, 1},
+	"AshTreeForest":          {-1, 0},
+	"CopperMine":             {2, 0},
+	"IronMine":               {1, 7},
+	"CoalMine":               {1, 6},
+	"Bank":                   {4, 1},
+	"Spruce":                 {2, 6},
+	"Sunflower":              {2, 2},
+	"Shrimp":                 {5, 2},
+	"Gudgeon":                {5, 2},
+	"Cooking":                {1, 1},
+	"WeaponCraftingStation":  {2, 1},
+	"Alchemy":                {2, 3},
+	"Chicken":                {0, 1},
+	"WoodCraftingStation":    {-2, -3},
+	"MiningStation":          {1, 5},
+	"Trout":                  {7, 12},
+	"GearCraftingStation":    {3, 1},
+	"JewelryCraftingStation": {1, 3},
 }
 
 func (state *CharacterState) move(location string) error {
@@ -65,6 +67,10 @@ func (state *CharacterState) moveToCopperMine() error {
 	return state.move("CopperMine")
 }
 
+func (state *CharacterState) moveToCoalMine() error {
+	return state.move("CoalMine")
+}
+
 func (state *CharacterState) moveToIronMine() error {
 	return state.move("IronMine")
 }
@@ -92,6 +98,11 @@ func (state *CharacterState) moveToGearCrafting() error {
 func (state *CharacterState) moveToMiningStation() error {
 	return state.move("MiningStation")
 }
+
+func (state *CharacterState) moveToJewelryCraftingStation() error {
+	return state.move("JewelryCraftingStation")
+}
+
 func (state *CharacterState) moveToGudgeon() error {
 	return state.move("Gudgeon")
 }
