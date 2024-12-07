@@ -411,7 +411,7 @@ func (state *CharacterState) setupLogging() error {
 
 	logger := slog.New(handler)
 	state.Logger = logger.WithGroup(state.Name)
-
+	slog.SetDefault(logger)
 	return nil
 }
 
