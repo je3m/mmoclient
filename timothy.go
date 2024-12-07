@@ -1,14 +1,22 @@
 package main
 
 func (state *CharacterState) timothyLoop() error {
+	return state.fishForShrimpLoop()
+}
+
+func (state *CharacterState) fishForShrimpLoop() error {
 	for {
-		state.dumpAtBank()
-
-		err := state.goFightEnemyRest("yellow_slime")
-
+		err := state.dumpAtBank()
 		if err != nil {
 			return err
 		}
-		return nil
+		err = state.moveToShrimp()
+		if err != nil {
+			return err
+		}
+		err = state.gatherUntil("shrimp", state.InventoryMaxItems)
+		if err != nil {
+			return err
+		}
 	}
 }

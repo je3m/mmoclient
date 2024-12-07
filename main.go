@@ -166,6 +166,7 @@ func (state *CharacterState) performActionAndWait(actionName string, actionData 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
 
+	state.Logger.Debug("sending request", "request", req)
 	// Send the request
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -443,6 +444,7 @@ func (state *CharacterState) goFightEnemy(enemyName string, healing_item string,
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -484,6 +486,10 @@ func (state *CharacterState) goFightEnemyRest(enemyName string) error {
 		return err
 	}
 	for {
+		if state.getInventoryFull() {
+			// no point in fighting bc we get no loot
+			return nil
+		}
 		err = state.fight()
 		if err != nil {
 			return err
@@ -576,12 +582,13 @@ func (state *CharacterState) craftItem(code string, qty int) error {
 	return nil
 }
 
-func (state *CharacterState) equipItem(code string, slot string) error {
+func (state *CharacterState) equipItem(code string, slot string, qty int) error {
 	type EquipItemRequest struct {
-		Code string `json:"code"`
-		Slot string `json:"slot"`
+		Code     string `json:"code"`
+		Slot     string `json:"slot"`
+		Quantity int    `json:"quantity"`
 	}
-	jsonData, err := json.Marshal(EquipItemRequest{code, slot})
+	jsonData, err := json.Marshal(EquipItemRequest{code, slot, qty})
 	if err != nil {
 		state.Logger.Error("Error marshalling request body: %v\n", err)
 		os.Exit(1)
@@ -806,5 +813,28 @@ func main() {
 			}
 			lastFail = time.Now()
 		}
+	}
+}
+
+func (state *CharacterState) fightGameLoop(monsterToFight string, food string, healAmount int) error {
+	state.rest()
+	for {
+		state.dumpAtBank()
+
+		// if we don't have it, we'll just rest
+		state.withdrawItemAtBank(food, 30)
+
+		if state.getItemInventoryQty(food) > 0 {
+			err := state.goFightEnemy(monsterToFight, food, healAmount)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := state.goFightEnemyRest("monsterToFight")
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 }

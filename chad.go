@@ -27,13 +27,6 @@ func (state *CharacterState) farmSpruce() error {
 }
 
 func (state *CharacterState) chadLoop() error {
-	for {
-		state.dumpAtBank()
-
-		err := state.goFightEnemyRest("yellow_slime")
-
-		if err != nil {
-			return err
-		}
-	}
+	return state.fightGameLoop("yellow_slime", "apple", 50)
+	//return state.farmSpruce()
 }
