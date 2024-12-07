@@ -6,11 +6,6 @@ import (
 	"os"
 )
 
-type MoveRequest struct {
-	X int `json:"x"`
-	Y int `json:"y"`
-}
-
 var locations = map[string]MoveRequest{
 	"AshTreeForest":         {-1, 0},
 	"CopperMine":            {2, 0},
