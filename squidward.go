@@ -2,9 +2,12 @@ package main
 
 func (state *CharacterState) squidwardLoop() error {
 	for {
-		state.dumpAtBank()
+		err := state.dumpAtBank()
+		if err != nil {
+			return err
+		}
 
-		err := state.moveToIronMine()
+		err = state.moveToIronMine()
 		if err != nil {
 			return err
 		}
