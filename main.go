@@ -497,10 +497,16 @@ func main() {
 func (state *CharacterState) fightGameLoop(monsterToFight string, food string, healAmount int) error {
 	state.rest()
 	for {
+		state.unequip("small_health_potion")
 		state.dumpAtBank()
 
+		state.withdrawItemAtBank("small_health_potion", 100)
+
+		// if it doesn't happen ig we die /shrug
+		state.equipItem("small_health_potion", "utility1", 100)
+
 		// if we don't have it, we'll just rest
-		state.withdrawItemAtBank(food, 30)
+		state.withdrawItemAtBank(food, 50)
 
 		if state.getItemInventoryQty(food) > 0 {
 			err := state.goFightEnemy(monsterToFight, food, healAmount)
@@ -508,7 +514,7 @@ func (state *CharacterState) fightGameLoop(monsterToFight string, food string, h
 				return err
 			}
 		} else {
-			err := state.goFightEnemyRest("monsterToFight")
+			err := state.goFightEnemyRest(monsterToFight)
 			if err != nil {
 				return err
 			}

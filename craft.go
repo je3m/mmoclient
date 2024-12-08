@@ -9,12 +9,13 @@ import (
 
 // Map skill->location
 var craftingSpots = map[string]string{
-	"weaponcrafting": "WeaponCraftingStation",
-	"cooking":        "Cooking",
-	"alchemy":        "Alchemy",
-	"woodcutting":    "WoodCraftingStation",
-	"mining":         "MiningStation",
-	"gearcrafting":   "GearCraftingStation",
+	"weaponcrafting":  "WeaponCraftingStation",
+	"cooking":         "Cooking",
+	"alchemy":         "Alchemy",
+	"woodcutting":     "WoodCraftingStation",
+	"mining":          "MiningStation",
+	"gearcrafting":    "GearCraftingStation",
+	"jewelrycrafting": "JewelryCraftingStation",
 }
 
 type ItemQueryResponse struct {
