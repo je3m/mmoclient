@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"time"
@@ -116,9 +117,50 @@ func doRequest(req *http.Request, response any) error {
 	return nil
 }
 
-func getMonsterLocation(state *CharacterState, monsterName string) (*MoveRequest, error) {
-	response := new(MapResponse)
+func (state *CharacterState) getMonsterLocation(monsterName string) (*MoveRequest, error) {
 	retval := new(MoveRequest)
+	request, err := state.getClosestLocation(monsterName, "monster")
+	if err != nil {
+		return request, err
+	}
+	return retval, nil
+}
+
+func (state *CharacterState) getResourceLocation(resourceName string) (*MoveRequest, error) {
+	retval, err := state.getClosestLocation(resourceName, "resource")
+	if err != nil {
+		return retval, err
+	}
+	return retval, nil
+}
+
+// return a MoveRequest representing the closest map location with given content
+func (state *CharacterState) getClosestLocation(contentCode string, contentType string) (*MoveRequest, error) {
+	myX := state.X
+	myY := state.Y
+	minDst := 9001.0
+
+	retval := new(MoveRequest)
+
+	resp, err := makeMapQuery(contentCode, contentType)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, spot := range resp.Data {
+		xDiff := math.Abs(float64(spot.X - myX))
+		yDiff := math.Abs(float64(spot.Y - myY))
+		dst := math.Sqrt(xDiff*xDiff + yDiff*yDiff)
+		if dst < minDst {
+			minDst = dst
+			retval.X = spot.X
+			retval.Y = spot.Y
+		}
+	}
+	return retval, err
+}
+func makeMapQuery(contentCode string, contentType string) (*MapResponse, error) {
+	response := new(MapResponse)
 
 	// Define the endpoint and token
 	apiURL := "https://api.artifactsmmo.com/maps"
@@ -126,8 +168,8 @@ func getMonsterLocation(state *CharacterState, monsterName string) (*MoveRequest
 	u, _ := url.Parse(apiURL)
 
 	q := u.Query()
-	q.Add("content_code", monsterName)
-	q.Add("content_type", "monster")
+	q.Add("content_code", contentCode)
+	q.Add("content_type", contentType)
 
 	u.RawQuery = q.Encode()
 
@@ -143,12 +185,10 @@ func getMonsterLocation(state *CharacterState, monsterName string) (*MoveRequest
 	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
 
 	err = doRequest(req, response)
-	for _, spot := range response.Data {
-		// TODO: go to closest
-		retval.X = spot.X
-		retval.Y = spot.Y
+	if err != nil {
+		return nil, err
 	}
-	return retval, nil
+	return response, nil
 }
 
 // perform given action and block until cooldown is up

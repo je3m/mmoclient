@@ -26,10 +26,6 @@ func (state *CharacterState) rest() {
 	state.performActionAndWait("rest", []byte{})
 }
 
-func (state *CharacterState) gathering() {
-	state.performActionAndWait("gathering", []byte{})
-}
-
 func (state *CharacterState) getItemInventoryQty(itemName string) int {
 	inv := state.Inventory
 	for _, item := range inv {
@@ -38,39 +34,6 @@ func (state *CharacterState) getItemInventoryQty(itemName string) int {
 		}
 	}
 	return 0
-}
-
-// Perform gathering action until inventory contains at least <quantity> of item
-func (state *CharacterState) gatherUntil(item string, quantity int) error {
-	numberRemaining := 1
-
-	state.Logger.Info("gathering_until",
-		"quantity", quantity,
-		"item", item)
-
-	for numberRemaining > 0 {
-		if state.getInventoryFull() {
-			state.Logger.Warn("Inventory full. returning early\n")
-			break
-		}
-
-		resp, err := state.performActionAndWait("gathering", []byte{})
-		if err != nil {
-			state.Logger.Error("Error making request", err)
-			return err
-		}
-		numberHas := resp.Data.Character.getItemInventoryQty(item)
-		numberRemaining = quantity - numberHas
-
-		state.Logger.Debug("progress made",
-			"action", "gathering",
-			"item", item,
-			"have", numberHas,
-			"need", quantity,
-			"remaining", numberRemaining)
-
-	}
-	return nil
 }
 
 func (state *CharacterState) grindCrafting(itemToCraft string, ingredientName string, numIngredientPerCraft int) error {
@@ -139,7 +102,7 @@ func (state *CharacterState) findWorthyEnemy() string {
 }
 
 func (state *CharacterState) goFightEnemy(enemyName string, healing_item string, heal_amount int) error {
-	location, err := getMonsterLocation(state, enemyName)
+	location, err := state.getMonsterLocation(enemyName)
 	if err != nil {
 		return err
 	}
@@ -184,7 +147,7 @@ func (state *CharacterState) healEfficient(healing_item string, amount_heal int)
 }
 
 func (state *CharacterState) goFightEnemyRest(enemyName string) error {
-	location, err := getMonsterLocation(state, enemyName)
+	location, err := state.getMonsterLocation(enemyName)
 	if err != nil {
 		return err
 	}
