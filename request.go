@@ -117,11 +117,17 @@ func doRequest(req *http.Request, response any) error {
 	return nil
 }
 
-func (state *CharacterState) getMonsterLocation(monsterName string) (*MoveRequest, error) {
-	retval := new(MoveRequest)
-	request, err := state.getClosestLocation(monsterName, "monster")
+func (state *CharacterState) getBankLocation() (*MoveRequest, error) {
+	retval, err := state.getClosestLocation("bank", "bank")
 	if err != nil {
-		return request, err
+		return nil, err
+	}
+	return retval, nil
+}
+func (state *CharacterState) getMonsterLocation(monsterName string) (*MoveRequest, error) {
+	retval, err := state.getClosestLocation(monsterName, "monster")
+	if err != nil {
+		return nil, err
 	}
 	return retval, nil
 }
@@ -159,6 +165,7 @@ func (state *CharacterState) getClosestLocation(contentCode string, contentType 
 	}
 	return retval, err
 }
+
 func makeMapQuery(contentCode string, contentType string) (*MapResponse, error) {
 	response := new(MapResponse)
 

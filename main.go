@@ -107,17 +107,11 @@ func (state *CharacterState) goFightEnemy(enemyName string, healing_item string,
 		return err
 	}
 
-	jsonData, err := json.Marshal(location)
-	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
-		os.Exit(1)
-	}
-
-	state.Logger.Debug("moving", "location", location)
-	_, err = state.performActionAndWait("move", jsonData)
+	err = state.moveToLocation(location)
 	if err != nil {
 		return err
 	}
+
 	err = state.fightUntilLowInventory(healing_item, heal_amount)
 	if err != nil {
 		return err
