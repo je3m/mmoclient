@@ -75,8 +75,27 @@ func (state *CharacterState) moveToIronMine() error {
 	return state.move("IronMine")
 }
 
+func (state *CharacterState) moveToLocation(location *MoveRequest) error {
+	jsonData, err := json.Marshal(location)
+	if err != nil {
+		state.Logger.Error("Error marshalling request body: %v\n", err)
+		os.Exit(1)
+	}
+
+	state.Logger.Debug("moving", "location", location)
+	_, err = state.performActionAndWait("move", jsonData)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (state *CharacterState) moveToBank() error {
-	return state.move("Bank")
+	location, err := state.getBankLocation()
+	if err != nil {
+		return err
+	}
+	return state.moveToLocation(location)
 }
 
 func (state *CharacterState) moveToSpruce() error {
