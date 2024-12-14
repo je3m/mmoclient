@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
-	"net/http"
+	"os"
 )
 
 // Map skill->location
@@ -16,81 +14,6 @@ var craftingSpots = map[string]string{
 	"mining":          "MiningStation",
 	"gearcrafting":    "GearCraftingStation",
 	"jewelrycrafting": "JewelryCraftingStation",
-}
-
-type ItemQueryResponse struct {
-	Data struct {
-		Name        string `json:"name"`
-		Code        string `json:"code"`
-		Level       int    `json:"level"`
-		Type        string `json:"type"`
-		Subtype     string `json:"subtype"`
-		Description string `json:"description"`
-		Effects     []struct {
-			Name  string `json:"name"`
-			Value int    `json:"value"`
-		} `json:"effects"`
-		Craft struct {
-			Skill string `json:"skill"`
-			Level int    `json:"level"`
-			Items []struct {
-				Code     string `json:"code"`
-				Quantity int    `json:"quantity"`
-			} `json:"items"`
-			Quantity int `json:"quantity"`
-		} `json:"craft"`
-		Tradeable bool `json:"tradeable"`
-	} `json:"data"`
-}
-
-func (state *CharacterState) getItemInfo(itemCode string) (*ItemQueryResponse, error) {
-	response := new(ItemQueryResponse)
-
-	// Define the endpoint and token
-	apiURL := "https://api.artifactsmmo.com/items/" + itemCode
-
-	// Create the HTTP request
-	req, err := http.NewRequest("GET", apiURL, bytes.NewBuffer([]byte{}))
-	if err != nil {
-		state.Logger.Error("Error creating request: %v\n", err)
-		return nil, err
-	}
-
-	// Set headers
-	req.Header.Set("Accept", "application/json")
-	//req.Header.Set("Content-Type", "application/json")
-
-	// Send the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		state.Logger.Error("Error making request: %v\n", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Read and display the response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		state.Logger.Error("Error reading response body\n", err)
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		state.Logger.Warn("getItemInfo Request failed with status",
-			"response_code", ArtifactsResponseCode(resp.StatusCode),
-			"val", resp.StatusCode)
-		return nil, ResponseCodeError{ArtifactsResponseCode(resp.StatusCode)}
-	}
-
-	err = json.Unmarshal(body, &response)
-
-	if err != nil {
-		state.Logger.Error("Error parsing response: %v\n", err)
-		return nil, err
-	}
-
-	return response, nil
 }
 
 // go get ingredients and craft an item at it's workshop
@@ -172,6 +95,52 @@ func (state *CharacterState) goCraftItemAndDependencies(itemCode string, qty int
 
 	err = state.goGetOrCraftItem(itemCode, qty)
 	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Perform cooking action until inventory contains at least <quantity> of item
+func (state *CharacterState) craftUntil(item string, quantity int) error {
+	numberRemaining := 1
+
+	state.Logger.Info("craft_until",
+		"quantity", quantity,
+		"item", item)
+
+	for numberRemaining > 0 {
+		err := state.craftItem(item, quantity)
+
+		if err != nil {
+			state.Logger.Error("Error crafting item: %v\n", err)
+			return err
+		}
+		numberHas := state.getItemInventoryQty(item)
+		numberRemaining = quantity - numberHas
+
+		state.Logger.Debug("progress made",
+			"action", "gathering",
+			"item", item,
+			"have", numberHas,
+			"need", quantity,
+			"remaining", numberRemaining)
+	}
+	return nil
+}
+
+func (state *CharacterState) craftItem(code string, qty int) error {
+	type CraftItemRequest struct {
+		Code     string `json:"code"`
+		Quantity int    `json:"quantity"`
+	}
+	jsonData, err := json.Marshal(CraftItemRequest{code, qty})
+	if err != nil {
+		state.Logger.Error("Error marshalling request body: %v\n", err)
+		os.Exit(1)
+	}
+	_, err = state.performActionAndWait("crafting", jsonData)
+	if err != nil {
+		state.Logger.Error("Error making crafting item: %v\n", err)
 		return err
 	}
 	return nil

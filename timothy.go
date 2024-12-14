@@ -1,7 +1,8 @@
 package main
 
 func (state *CharacterState) timothyLoop() error {
-	return state.fishForShrimpLoop()
+	return state.fightGameLoop("mushmush", "cooked_chicken", 80)
+
 }
 
 func (state *CharacterState) fishForShrimpLoop() error {

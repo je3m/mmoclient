@@ -23,14 +23,14 @@ function start_all_characters {
 	done
 }
 
-function kill_character {
+function stop_character {
 	character="$1"
 	pidpath="$character.pid"
 	kill `cat $pidpath`
 	rm "$pidpath"
 }
 
-function kill_all_characters {
+function stop_all_characters {
 	for character in "${CHARACTERS[@]}"
 	do
 		kill_character "$character"
