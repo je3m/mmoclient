@@ -1,7 +1,7 @@
 package main
 
 func (state *CharacterState) lilyLoop() error {
-	return state.fightGameLoop("frost_slime", "cooked_shrimp", 150)
+	return state.fightGameLoop("gingerbread", "cooked_shrimp", 150)
 	//for {
 	//	state.dumpAtBank()
 	//

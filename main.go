@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"strconv"
 	"time"
@@ -56,34 +57,6 @@ func (state *CharacterState) grindCrafting(itemToCraft string, ingredientName st
 	return nil
 }
 
-// Perform cooking action until inventory contains at least <quantity> of item
-func (state *CharacterState) craftUntil(item string, quantity int) error {
-	numberRemaining := 1
-
-	state.Logger.Info("craft_until",
-		"quantity", quantity,
-		"item", item)
-
-	for numberRemaining > 0 {
-		err := state.craftItem(item, quantity)
-
-		if err != nil {
-			state.Logger.Error("Error crafting item: %v\n", err)
-			return err
-		}
-		numberHas := state.getItemInventoryQty(item)
-		numberRemaining = quantity - numberHas
-
-		state.Logger.Debug("progress made",
-			"action", "gathering",
-			"item", item,
-			"have", numberHas,
-			"need", quantity,
-			"remaining", numberRemaining)
-	}
-	return nil
-}
-
 func (state *CharacterState) findWorthyEnemy() string {
 	maxLevel := state.Level - 1
 	mostWorthy := ""
@@ -120,21 +93,19 @@ func (state *CharacterState) goFightEnemy(enemyName string, healing_item string,
 	return nil
 }
 
-// heal as much as possible without waste
-func (state *CharacterState) healEfficient(healing_item string, amount_heal int) error {
+// heal to full
+func (state *CharacterState) healToFull(healing_item string, amount_heal int) error {
 	numHave := state.getItemInventoryQty(healing_item)
 	hpToHeal := state.MaxHp - state.Hp
-	numNeeded := hpToHeal / amount_heal
+	numNeeded := int(math.Ceil(float64(hpToHeal) / float64(amount_heal)))
 
-	numToConsume := min(numNeeded, numHave)
-	if hpToHeal > amount_heal*9/10 {
-		state.Logger.Info("healing", "start_hp", state.Hp)
+	if numNeeded <= 0 {
+		return nil
+	}
 
-		err := state.useItem(healing_item, max(1, numToConsume)) //TODO: this is bad hack to keep killing yellow slimes overnight
-		if err != nil {
-			return err
-		}
-		state.Logger.Info("healing", "end_hp", state.Hp)
+	err := state.useItem(healing_item, min(numHave, numNeeded))
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -179,7 +150,7 @@ func (state *CharacterState) fightUntilLowInventory(healing_item string, amount_
 		"healing_item", healing_item)
 
 	for numHealItem > 0 {
-		err := state.healEfficient(healing_item, amount_heal)
+		err := state.healToFull(healing_item, amount_heal)
 
 		if err != nil {
 			state.Logger.Error("Error healing", "error", err)
@@ -231,24 +202,6 @@ func (state *CharacterState) recycleItem(code string, qty int) error {
 
 	_, err = state.performActionAndWait("recycling", jsonData)
 	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (state *CharacterState) craftItem(code string, qty int) error {
-	type CraftItemRequest struct {
-		Code     string `json:"code"`
-		Quantity int    `json:"quantity"`
-	}
-	jsonData, err := json.Marshal(CraftItemRequest{code, qty})
-	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
-		os.Exit(1)
-	}
-	_, err = state.performActionAndWait("crafting", jsonData)
-	if err != nil {
-		state.Logger.Error("Error making crafting item: %v\n", err)
 		return err
 	}
 	return nil
@@ -475,13 +428,11 @@ func main() {
 		if err != nil {
 			currentTime := time.Now()
 			timeSinceLastFail := currentTime.Sub(lastFail)
-
 			if timeSinceLastFail < time.Duration(5)*time.Minute {
-				state.Logger.Error("Error in gameloop. killing program")
+				state.Logger.Error("Error in gameloop. killing program", "error", err)
 				return
 			} else {
-				state.Logger.Error("Error in gameloop. rebooting character...")
-
+				state.Logger.Error("Error in gameloop. rebooting character...", "error", err)
 			}
 			lastFail = time.Now()
 		}

@@ -27,6 +27,6 @@ func (state *CharacterState) farmSpruce() error {
 }
 
 func (state *CharacterState) chadLoop() error {
-	return state.fightGameLoop("mushmush", "cooked_shrimp", 150)
+	return state.fightGameLoop("gingerbread", "cooked_shrimp", 150)
 	//return state.farmSpruce()
 }

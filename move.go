@@ -85,6 +85,13 @@ func (state *CharacterState) moveToLocation(location *MoveRequest) error {
 	state.Logger.Debug("moving", "location", location)
 	_, err = state.performActionAndWait("move", jsonData)
 	if err != nil {
+		var responseCodeError ResponseCodeError
+		if errors.As(err, &responseCodeError) {
+			if responseCodeError.code == CodeCharacterAlreadyMap {
+				// we are already here so it's fine
+				return nil
+			}
+		}
 		return err
 	}
 	return nil
