@@ -1,7 +1,7 @@
 package main
 
 func (state *CharacterState) timothyLoop() error {
-	return state.fightGameLoop("mushmush", "cooked_chicken", 80)
+	return state.fightGameLoop("gingerbread", "cooked_chicken", 80)
 
 }
 
