@@ -139,7 +139,7 @@ func doRequest(req *http.Request, response any) error {
 	err = json.Unmarshal(body, &response)
 
 	if err != nil {
-		slog.Error("Error parsing response: %v\n", err)
+		slog.Error("Error parsing response: ", "error", err)
 		return err
 	}
 	slog.Debug("received response", "response", response)
@@ -219,7 +219,7 @@ func makeMapQuery(contentCode string, contentType string) (*MapResponse, error) 
 	// Set headers
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
+	req.Header.Set("Authorization", "Bearer "+ApiToken)
 
 	err = doRequest(req, response)
 	if err != nil {
@@ -262,7 +262,7 @@ func (state *CharacterState) getItemInfo(itemCode string) (*ItemQueryResponse, e
 	// Create the HTTP request
 	req, err := http.NewRequest("GET", apiURL, bytes.NewBuffer([]byte{}))
 	if err != nil {
-		state.Logger.Error("Error creating request: %v\n", err)
+		state.Logger.Error("Error creating request", "error", err)
 		return nil, err
 	}
 
@@ -288,14 +288,14 @@ func (state *CharacterState) performActionAndWait(actionName string, actionData 
 	// Create the HTTP request
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(actionData))
 	if err != nil {
-		state.Logger.Error("Error creating request: %v\n", err)
+		state.Logger.Error("Error creating request", "error", err)
 		return nil, err
 	}
 
 	// Set headers
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
+	req.Header.Set("Authorization", "Bearer "+ApiToken)
 
 	err = doRequest(req, response)
 	if err != nil {
@@ -327,7 +327,7 @@ func getGameStatus() ([]CharacterState, error) {
 	// Set headers
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
+	req.Header.Set("Authorization", "Bearer "+ApiToken)
 
 	err = doRequest(req, response)
 	if err != nil {
@@ -352,7 +352,7 @@ func getMonsterDB() (*MonsterResponse, error) {
 	// Set headers
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
+	req.Header.Set("Authorization", "Bearer "+ApiToken)
 
 	err = doRequest(req, response)
 	if err != nil {

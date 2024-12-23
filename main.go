@@ -13,7 +13,7 @@ import (
 
 var MonsterDB *MonsterResponse
 
-var API_TOKEN = ""
+var ApiToken = ""
 
 func (state *CharacterState) fight() error {
 	_, err := state.performActionAndWait("fight", []byte{})
@@ -23,8 +23,9 @@ func (state *CharacterState) fight() error {
 	return nil
 }
 
-func (state *CharacterState) rest() {
-	state.performActionAndWait("rest", []byte{})
+func (state *CharacterState) rest() error {
+	_, err := state.performActionAndWait("rest", []byte{})
+	return err
 }
 
 func (state *CharacterState) getItemInventoryQty(itemName string) int {
@@ -119,7 +120,7 @@ func (state *CharacterState) goFightEnemyRest(enemyName string) error {
 
 	jsonData, err := json.Marshal(location)
 	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body", "error", err)
 		os.Exit(1)
 	}
 
@@ -137,9 +138,11 @@ func (state *CharacterState) goFightEnemyRest(enemyName string) error {
 		if err != nil {
 			return err
 		}
-		state.rest()
+		err = state.rest()
+		if err != nil {
+			return err
+		}
 	}
-	return nil
 }
 
 // fight until out of hp and healing item
@@ -177,18 +180,28 @@ func (state *CharacterState) fightUntilLowInventory(healing_item string, amount_
 	return nil
 }
 
-func (state *CharacterState) unequip(slot string) {
+func (state *CharacterState) unequip(slot string) error {
 	type UnequipRequest struct {
 		Slot string `json:"slot"`
 	}
 
 	jsonData, err := json.Marshal(UnequipRequest{slot})
 	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body", "error", err)
 		os.Exit(1)
 	}
 
-	state.performActionAndWait("unequip", jsonData)
+	_, err = state.performActionAndWait("unequip", jsonData)
+
+	var respError ResponseCodeError
+
+	if errors.As(err, &respError) {
+		// CodeInvalidPayload means that it was not equipped
+		if respError.code != CodeInvalidPayload {
+			return err
+		}
+	}
+	return nil
 }
 func (state *CharacterState) recycleItem(code string, qty int) error {
 	type RecycleItemRequest struct {
@@ -215,12 +228,12 @@ func (state *CharacterState) equipItem(code string, slot string, qty int) error 
 	}
 	jsonData, err := json.Marshal(EquipItemRequest{code, slot, qty})
 	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body", "error", err)
 		os.Exit(1)
 	}
 	_, err = state.performActionAndWait("equip", jsonData)
 	if err != nil {
-		state.Logger.Error("Error equiping item: %v\n", err)
+		state.Logger.Error("Error equiping item", "error", err)
 		return err
 	}
 	return nil
@@ -233,12 +246,12 @@ func (state *CharacterState) useItem(code string, quantity int) error {
 	}
 	jsonData, err := json.Marshal(UseItemRequest{code, quantity})
 	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body", "error", err)
 		os.Exit(1)
 	}
 	_, err = state.performActionAndWait("use", jsonData)
 	if err != nil {
-		state.Logger.Error("Error using item", err)
+		state.Logger.Error("Error using item", "error", err)
 		return err
 	}
 	return nil
@@ -251,7 +264,7 @@ func (state *CharacterState) depositItemAtBank(code string, qty int) error {
 	}
 	jsonData, err := json.Marshal(DepositItemRequest{code, qty})
 	if err != nil {
-		state.Logger.Error("Error marshalling request body", err)
+		state.Logger.Error("Error marshalling request body", "error", err)
 		os.Exit(1)
 	}
 	_, err = state.performActionAndWait("bank/deposit", jsonData)
@@ -268,12 +281,12 @@ func (state *CharacterState) withdrawItemAtBank(code string, qty int) error {
 	}
 	jsonData, err := json.Marshal(WithdrawItemRequest{code, qty})
 	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body", "error", err)
 		os.Exit(1)
 	}
 	_, err = state.performActionAndWait("bank/withdraw", jsonData)
 	if err != nil {
-		state.Logger.Warn("Error withdrawing item: %v\n", err)
+		state.Logger.Warn("Error withdrawing item", "error", err)
 		return err
 	}
 	return nil
@@ -307,12 +320,12 @@ func (state *CharacterState) getInventoryFull() bool {
 }
 
 func setApiToken() {
-	api_tok, err := os.ReadFile("token.txt")
+	apiTok, err := os.ReadFile("token.txt")
 	if err != nil {
-		slog.Error("Failed to read API token: %v\n", err)
+		slog.Error("Failed to read API token", "error", err)
 		os.Exit(1)
 	}
-	API_TOKEN = string(api_tok)
+	ApiToken = string(apiTok)
 }
 func (state *CharacterState) setupLogging() error {
 	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -363,7 +376,7 @@ func setupStates(stateRefs map[string]*CharacterState) error {
 
 		err = states[i].setupLogging()
 		if err != nil {
-			println("Failed to setup logging: %v\n", err)
+			println("Failed to setup logging", "error", err)
 			os.Exit(1)
 		}
 	}
@@ -379,7 +392,9 @@ func makePidfile(characterName string) (string, error) {
 		return "", err
 	}
 
-	defer file.Close()
+	defer func(file *os.File) {
+		_ = file.Close()
+	}(file)
 
 	// Write the PID to the file
 	_, err = file.WriteString(strconv.Itoa(pid))
@@ -399,7 +414,9 @@ func main() {
 		return
 	}
 
-	defer os.Remove(pidFile)
+	defer func(name string) {
+		_ = os.Remove(name)
+	}(pidFile)
 
 	setApiToken()
 
@@ -440,18 +457,34 @@ func main() {
 }
 
 func (state *CharacterState) fightGameLoop(monsterToFight string, food string, healAmount int) error {
-	state.rest()
+	err := state.rest()
+	if err != nil {
+		return err
+	}
+
 	for {
-		state.unequip("small_health_potion")
-		state.dumpAtBank()
+		err = state.unequip("small_health_potion")
+		if err != nil {
+			return err
+		}
+		err = state.dumpAtBank()
+		if err != nil {
+			return err
+		}
 
-		state.withdrawItemAtBank("small_health_potion", 100)
+		err = state.withdrawItemAtBank("small_health_potion", 100)
+		if err == nil {
+			err = state.equipItem("small_health_potion", "utility1", 100)
+		}
 
-		// if it doesn't happen ig we die /shrug
-		state.equipItem("small_health_potion", "utility1", 100)
+		if err != nil {
+			state.Logger.Warn("Could not get/equip potions. Maybe we'll just die")
+		}
 
-		// if we don't have it, we'll just rest
-		state.withdrawItemAtBank(food, 50)
+		err = state.withdrawItemAtBank(food, 50)
+		if err != nil {
+			state.Logger.Warn("Could not withdraw food. We'll just have to rest")
+		}
 
 		if state.getItemInventoryQty(food) > 0 {
 			err := state.goFightEnemy(monsterToFight, food, healAmount)

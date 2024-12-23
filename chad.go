@@ -2,9 +2,11 @@ package main
 
 func (state *CharacterState) farmSpruce() error {
 	for {
-		state.dumpAtBank()
-
-		err := state.moveToSpruce()
+		err := state.dumpAtBank()
+		if err != nil {
+			return err
+		}
+		err = state.moveToSpruce()
 		if err != nil {
 			return err
 		}
@@ -23,10 +25,8 @@ func (state *CharacterState) farmSpruce() error {
 			return err
 		}
 	}
-	return nil
 }
 
 func (state *CharacterState) chadLoop() error {
 	return state.fightGameLoop("gingerbread", "cooked_shrimp", 150)
-	//return state.farmSpruce()
 }
