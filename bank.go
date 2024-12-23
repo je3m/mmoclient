@@ -27,28 +27,30 @@ func (state *CharacterState) getBankContents() (*BankContents, error) {
 	// Create the HTTP request
 	req, err := http.NewRequest("GET", apiURL, bytes.NewBuffer([]byte{}))
 	if err != nil {
-		state.Logger.Error("Error creating request: %v\n", err)
+		state.Logger.Error("Error creating request", "error", err)
 		return nil, err
 	}
 
 	// Set headers
 	req.Header.Set("Accept", "application/json")
 	//req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+API_TOKEN)
+	req.Header.Set("Authorization", "Bearer "+ApiToken)
 
 	// Send the request
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		state.Logger.Error("Error making request: %v\n", err)
+		state.Logger.Error("Error making request", "error", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	// Read and display the response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		state.Logger.Error("Error reading response body\n", err)
+		state.Logger.Error("Error reading response body", "error", err)
 		return nil, err
 	}
 
@@ -62,7 +64,7 @@ func (state *CharacterState) getBankContents() (*BankContents, error) {
 	err = json.Unmarshal(body, &response)
 
 	if err != nil {
-		state.Logger.Error("Error parsing response: %v\n", err)
+		state.Logger.Error("Error parsing response", "error", err)
 		return nil, err
 	}
 

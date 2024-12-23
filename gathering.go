@@ -21,7 +21,7 @@ func (state *CharacterState) gatherUntil(item string, quantity int) error {
 
 		resp, err := state.performActionAndWait("gathering", []byte{})
 		if err != nil {
-			state.Logger.Error("Error making request", err)
+			state.Logger.Error("Error making request", "error", err)
 			return err
 		}
 		numberHas := resp.Data.Character.getItemInventoryQty(item)
@@ -47,7 +47,7 @@ func (state *CharacterState) goGather(item string, quantity int) error {
 
 	jsonData, err := json.Marshal(location)
 	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body", "error", err)
 		os.Exit(1)
 	}
 

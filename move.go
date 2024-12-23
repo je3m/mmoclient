@@ -78,7 +78,7 @@ func (state *CharacterState) moveToIronMine() error {
 func (state *CharacterState) moveToLocation(location *MoveRequest) error {
 	jsonData, err := json.Marshal(location)
 	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body", "error", err)
 		os.Exit(1)
 	}
 

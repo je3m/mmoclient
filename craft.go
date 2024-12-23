@@ -112,7 +112,7 @@ func (state *CharacterState) craftUntil(item string, quantity int) error {
 		err := state.craftItem(item, quantity)
 
 		if err != nil {
-			state.Logger.Error("Error crafting item: %v\n", err)
+			state.Logger.Error("Error crafting item", "error", err)
 			return err
 		}
 		numberHas := state.getItemInventoryQty(item)
@@ -135,12 +135,12 @@ func (state *CharacterState) craftItem(code string, qty int) error {
 	}
 	jsonData, err := json.Marshal(CraftItemRequest{code, qty})
 	if err != nil {
-		state.Logger.Error("Error marshalling request body: %v\n", err)
+		state.Logger.Error("Error marshalling request body", "error", err)
 		os.Exit(1)
 	}
 	_, err = state.performActionAndWait("crafting", jsonData)
 	if err != nil {
-		state.Logger.Error("Error making crafting item: %v\n", err)
+		state.Logger.Error("Error making crafting item", "error", err)
 		return err
 	}
 	return nil
