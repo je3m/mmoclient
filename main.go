@@ -75,7 +75,7 @@ func (state *CharacterState) findWorthyEnemy() string {
 	return mostWorthy
 }
 
-func (state *CharacterState) goFightEnemy(enemyName string, healing_item string, heal_amount int) error {
+func (state *CharacterState) goFightEnemy(enemyName string, healingItem string, healAmount int) error {
 	location, err := state.getMonsterLocation(enemyName)
 	if err != nil {
 		return err
@@ -86,7 +86,7 @@ func (state *CharacterState) goFightEnemy(enemyName string, healing_item string,
 		return err
 	}
 
-	err = state.fightUntilLowInventory(healing_item, heal_amount)
+	err = state.fightUntilLowInventory(healingItem, healAmount)
 	if err != nil {
 		return err
 	}
@@ -95,16 +95,16 @@ func (state *CharacterState) goFightEnemy(enemyName string, healing_item string,
 }
 
 // heal to full
-func (state *CharacterState) healToFull(healing_item string, amount_heal int) error {
-	numHave := state.getItemInventoryQty(healing_item)
+func (state *CharacterState) healToFull(healingItem string, amountHeal int) error {
+	numHave := state.getItemInventoryQty(healingItem)
 	hpToHeal := state.MaxHp - state.Hp
-	numNeeded := int(math.Ceil(float64(hpToHeal) / float64(amount_heal)))
+	numNeeded := int(math.Ceil(float64(hpToHeal) / float64(amountHeal)))
 
 	if numNeeded <= 0 {
 		return nil
 	}
 
-	err := state.useItem(healing_item, min(numHave, numNeeded))
+	err := state.useItem(healingItem, min(numHave, numNeeded))
 	if err != nil {
 		return err
 	}
@@ -146,14 +146,14 @@ func (state *CharacterState) goFightEnemyRest(enemyName string) error {
 }
 
 // fight until out of hp and healing item
-func (state *CharacterState) fightUntilLowInventory(healing_item string, amount_heal int) error {
-	numHealItem := state.getItemInventoryQty(healing_item)
-	fight_count := 0
+func (state *CharacterState) fightUntilLowInventory(healingItem string, amountHeal int) error {
+	numHealItem := state.getItemInventoryQty(healingItem)
+	fightCount := 0
 	state.Logger.Info("fight_forever",
-		"healing_item", healing_item)
+		"healing_item", healingItem)
 
 	for numHealItem > 0 {
-		err := state.healToFull(healing_item, amount_heal)
+		err := state.healToFull(healingItem, amountHeal)
 
 		if err != nil {
 			state.Logger.Error("Error healing", "error", err)
@@ -169,12 +169,12 @@ func (state *CharacterState) fightUntilLowInventory(healing_item string, amount_
 			return err
 		}
 
-		fight_count++
-		numHealItem = state.getItemInventoryQty(healing_item)
+		fightCount++
+		numHealItem = state.getItemInventoryQty(healingItem)
 
 		state.Logger.Debug("progress made",
 			"action", "fighting",
-			"fights_won", fight_count,
+			"fights_won", fightCount,
 			"remaining", numHealItem)
 	}
 	return nil
@@ -233,7 +233,7 @@ func (state *CharacterState) equipItem(code string, slot string, qty int) error 
 	}
 	_, err = state.performActionAndWait("equip", jsonData)
 	if err != nil {
-		state.Logger.Error("Error equiping item", "error", err)
+		state.Logger.Error("Error equipping item", "error", err)
 		return err
 	}
 	return nil
