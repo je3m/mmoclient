@@ -1,6 +1,29 @@
 package main
 
 func (state *CharacterState) lilyLoop() error {
+	loadout := CharacterEquipment{
+		WeaponSlot:           "iron_dagger",
+		ShieldSlot:           "slime_shield",
+		HelmetSlot:           "adventurer_helmet",
+		BodyArmorSlot:        "adventurer_vest",
+		LegArmorSlot:         "adventurer_pants",
+		BootsSlot:            "iron_boots",
+		Ring1Slot:            "forest_ring",
+		Ring2Slot:            "forest_ring",
+		AmuletSlot:           "air_and_water_amulet",
+		Artifact1Slot:        "christmas_star",
+		Artifact2Slot:        "",
+		Artifact3Slot:        "",
+		Utility1Slot:         "",
+		Utility1SlotQuantity: 0,
+		Utility2Slot:         "",
+		Utility2SlotQuantity: 0,
+	}
+	err := state.goEquipLoadout(loadout)
+	if err != nil {
+		return err
+	}
+
 	return state.fightGameLoop("gingerbread", "cooked_shrimp", 150)
 	//for {
 	//	state.dumpAtBank()

@@ -131,12 +131,15 @@ func (state *CharacterState) goEquipLoadout(equipment CharacterEquipment) error 
 		itemCode := itemValue.Interface().(string)
 		slotName := field.Tag.Get("slot")
 
-		qty := 1
-		qtyField := field.Name + "Quantity"
-		qtyValue := itemValue.FieldByName(qtyField).Interface().(int)
+		if itemCode == "" {
+			continue
+		}
 
-		if qtyValue != 0 {
-			qty = qtyValue
+		qty := 1
+		qtyFieldName := field.Name + "Quantity"
+		qtyField := equipValue.FieldByName(qtyFieldName)
+		if qtyField.IsValid() {
+			qty = qtyField.Interface().(int)
 		}
 
 		err = state.withdrawItemAtBank(itemCode, qty)
